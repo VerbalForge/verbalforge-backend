@@ -5,7 +5,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 
 	"verbalforge-backend/models"
@@ -44,7 +43,7 @@ func GetProfile(c *gin.Context) {
 		return
 	}
 
-	user, err := userController.GetUserByID(userID.(primitive.ObjectID))
+	user, err := userController.GetUserByID(userID.(string))
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 		return
@@ -86,14 +85,14 @@ func UpdateProfile(c *gin.Context) {
 	}
 
 	// Update user
-	err := userController.UpdateUser(userID.(primitive.ObjectID), updates)
+	err := userController.UpdateUser(userID.(string), updates)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update profile"})
 		return
 	}
 
 	// Get updated user
-	user, err := userController.GetUserByID(userID.(primitive.ObjectID))
+	user, err := userController.GetUserByID(userID.(string))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve updated profile"})
 		return
@@ -145,14 +144,14 @@ func UpdatePreference(c *gin.Context) {
 	updates := bson.M{updateField: req.Value}
 
 	// Update preference
-	err := userController.UpdateUser(userID.(primitive.ObjectID), updates)
+	err := userController.UpdateUser(userID.(string), updates)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update preference"})
 		return
 	}
 
 	// Get updated user
-	user, err := userController.GetUserByID(userID.(primitive.ObjectID))
+	user, err := userController.GetUserByID(userID.(string))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve updated user"})
 		return
@@ -172,7 +171,7 @@ func GetPreferences(c *gin.Context) {
 		return
 	}
 
-	user, err := userController.GetUserByID(userID.(primitive.ObjectID))
+	user, err := userController.GetUserByID(userID.(string))
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 		return
@@ -197,14 +196,14 @@ func UpdateTheme(c *gin.Context) {
 
 	// Update theme preference
 	updates := bson.M{"preferences.theme": req.Theme}
-	err := userController.UpdateUser(userID.(primitive.ObjectID), updates)
+	err := userController.UpdateUser(userID.(string), updates)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update theme"})
 		return
 	}
 
 	// Get updated user
-	user, err := userController.GetUserByID(userID.(primitive.ObjectID))
+	user, err := userController.GetUserByID(userID.(string))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve updated user"})
 		return

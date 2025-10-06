@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -25,25 +24,24 @@ type QuestionMetadata struct {
 }
 
 type Question struct {
-	ID              primitive.ObjectID `json:"id" bson:"_id,omitempty"`
-	QuestionID      string             `json:"question_id" bson:"question_id"`
-	QuestionType    string             `json:"question_type" bson:"question_type"`
-	DifficultyLevel string             `json:"difficulty_level" bson:"difficulty_level"`
-	Topic           string             `json:"topic" bson:"topic"`
-	QuestionText    string             `json:"question_text" bson:"question_text"`
-	PassageID       string             `json:"passage_id,omitempty" bson:"passage_id,omitempty"` // Optional, only for RC questions
-	Choices         []Choice           `json:"choices" bson:"choices"`
-	Metadata        QuestionMetadata   `json:"metadata" bson:"metadata"`
+	ID              string           `json:"id" bson:"_id,omitempty"`
+	QuestionType    string           `json:"question_type" bson:"question_type"`
+	DifficultyLevel string           `json:"difficulty_level" bson:"difficulty_level"`
+	Topic           string           `json:"topic" bson:"topic"`
+	QuestionText    string           `json:"question_text" bson:"question_text"`
+	PassageID       string           `json:"passage_id,omitempty" bson:"passage_id,omitempty"` // Optional, only for RC questions
+	Choices         []Choice         `json:"choices" bson:"choices"`
+	Metadata        QuestionMetadata `json:"metadata" bson:"metadata"`
 }
 
 // PartialQuestion contains minimal question information for listing
 type PartialQuestion struct {
-	QuestionID      string    `json:"question_id" bson:"question_id"`
-	QuestionType    string    `json:"question_type" bson:"question_type"`
-	DifficultyLevel string    `json:"difficulty_level" bson:"difficulty_level"`
-	Topic           string    `json:"topic" bson:"topic"`
-	QuestionText    string    `json:"question_text" bson:"question_text"`
-	CreatedAt       time.Time `json:"created_at" bson:"metadata.created_at"`
+	ID              string `json:"id" bson:"_id,omitempty"`
+	QuestionType    string `json:"question_type" bson:"question_type"`
+	DifficultyLevel string `json:"difficulty_level" bson:"difficulty_level"`
+	Topic           string `json:"topic" bson:"topic"`
+	QuestionText    string `json:"question_text" bson:"question_text"`
+	CreatedAt       string `json:"created_at" bson:"metadata.created_at"`
 }
 
 type QuestionModel struct {
@@ -98,7 +96,7 @@ func (q *QuestionModel) GetPartialQuestions(filter bson.M, limit int64, skip int
 
 	// Only select the fields we need
 	opts.SetProjection(bson.M{
-		"question_id":         1,
+		"_id":                 1,
 		"question_type":       1,
 		"difficulty_level":    1,
 		"topic":               1,
@@ -121,24 +119,11 @@ func (q *QuestionModel) GetPartialQuestions(filter bson.M, limit int64, skip int
 }
 
 // GetQuestionByID returns a single question by ID
-func (q *QuestionModel) GetQuestionByID(id primitive.ObjectID) (*Question, error) {
+func (q *QuestionModel) GetQuestionByID(id string) (*Question, error) {
 	ctx := context.Background()
 	var question Question
 
 	err := q.collection.FindOne(ctx, bson.M{"_id": id}).Decode(&question)
-	if err != nil {
-		return nil, err
-	}
-
-	return &question, nil
-}
-
-// GetQuestionByQuestionID returns a single question by question_id
-func (q *QuestionModel) GetQuestionByQuestionID(questionID string) (*Question, error) {
-	ctx := context.Background()
-	var question Question
-
-	err := q.collection.FindOne(ctx, bson.M{"question_id": questionID}).Decode(&question)
 	if err != nil {
 		return nil, err
 	}

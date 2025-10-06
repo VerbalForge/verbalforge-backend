@@ -6,7 +6,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 
 	"verbalforge-backend/middleware"
@@ -108,7 +107,7 @@ func GetCurrentUser(c *gin.Context) {
 		return
 	}
 
-	user, err := userModel.GetUserByID(userID.(primitive.ObjectID))
+	user, err := userModel.GetUserByID(userID.(string))
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 		return
@@ -145,7 +144,7 @@ func ChangePassword(c *gin.Context) {
 	}
 
 	// Change password
-	err := userModel.ChangePassword(userID.(primitive.ObjectID), req.CurrentPassword, req.NewPassword)
+	err := userModel.ChangePassword(userID.(string), req.CurrentPassword, req.NewPassword)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -168,7 +167,7 @@ func DeleteAccount(c *gin.Context) {
 		return
 	}
 
-	err := userModel.DeleteAccount(userID.(primitive.ObjectID), req.Password)
+	err := userModel.DeleteAccount(userID.(string), req.Password)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -180,12 +179,13 @@ func DeleteAccount(c *gin.Context) {
 // generateToken creates a JWT token for the user
 func generateToken(user *models.User) (string, error) {
 	claims := &middleware.Claims{
-		UserID: user.ID,
-		Email:  user.Email,
+		UserID:   user.ID,
+		Email:    user.Email,
+		Username: user.Username,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
-			Subject:   user.ID.Hex(),
+			Subject:   user.ID,
 		},
 	}
 

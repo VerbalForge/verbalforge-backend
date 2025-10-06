@@ -6,7 +6,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 
 	"verbalforge-backend/middleware"
@@ -108,7 +107,7 @@ func (h *AuthHandler) GetCurrentUser(c *gin.Context) {
 		return
 	}
 
-	user, err := h.userModel.GetUserByID(userID.(primitive.ObjectID))
+	user, err := h.userModel.GetUserByID(userID.(string))
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 		return
@@ -144,7 +143,7 @@ func (h *AuthHandler) ChangePassword(c *gin.Context) {
 	}
 
 	// Change password
-	err := h.userModel.ChangePassword(userID.(primitive.ObjectID), req.CurrentPassword, req.NewPassword)
+	err := h.userModel.ChangePassword(userID.(string), req.CurrentPassword, req.NewPassword)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -160,7 +159,7 @@ func (h *AuthHandler) generateToken(user *models.User) (string, error) {
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
-			Subject:   user.ID.Hex(),
+			Subject:   user.ID,
 		},
 	}
 

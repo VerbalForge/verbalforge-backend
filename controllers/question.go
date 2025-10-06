@@ -9,7 +9,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 
 	"verbalforge-backend/models"
@@ -87,24 +86,7 @@ func GetQuestions(c *gin.Context) {
 
 // GetQuestionByID returns a single question by its ID
 func GetQuestionByID(c *gin.Context) {
-	questionIDStr := c.Param("id")
-
-	// Try to parse as ObjectID first
-	questionID, err := primitive.ObjectIDFromHex(questionIDStr)
-	if err != nil {
-		// If not a valid ObjectID, try to find by question_id
-		question, err := questionController.GetQuestionByQuestionID(questionIDStr)
-		if err != nil {
-			if err == mongo.ErrNoDocuments {
-				c.JSON(http.StatusNotFound, gin.H{"error": "Question not found"})
-				return
-			}
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch question"})
-			return
-		}
-		c.JSON(http.StatusOK, question)
-		return
-	}
+	questionID := c.Param("id")
 
 	question, err := questionController.GetQuestionByID(questionID)
 	if err != nil {
@@ -112,7 +94,7 @@ func GetQuestionByID(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Question not found"})
 			return
 		}
-		log.Printf("Error fetching question by ObjectID %s: %v", questionID.Hex(), err)
+		log.Printf("Error fetching question by ID %s: %v", questionID, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch question"})
 		return
 	}

@@ -5,8 +5,8 @@ import (
 	"errors"
 	"time"
 
+	"github.com/google/uuid"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -23,16 +23,16 @@ type UserPreferences struct {
 }
 
 type User struct {
-	ID          primitive.ObjectID `json:"id" bson:"_id,omitempty"`
-	Name        string             `json:"name" bson:"name"`
-	Username    string             `json:"username" bson:"username"`
-	Email       string             `json:"email" bson:"email"`
-	Phone       string             `json:"phone" bson:"phone"`
-	Bio         string             `json:"bio" bson:"bio"`
-	Password    string             `json:"-" bson:"password"`
-	Preferences UserPreferences    `json:"preferences" bson:"preferences"`
-	CreatedAt   time.Time          `json:"createdAt" bson:"createdAt"`
-	UpdatedAt   time.Time          `json:"updatedAt" bson:"updatedAt"`
+	ID          string          `json:"id" bson:"_id,omitempty"`
+	Name        string          `json:"name" bson:"name"`
+	Username    string          `json:"username" bson:"username"`
+	Email       string          `json:"email" bson:"email"`
+	Phone       string          `json:"phone" bson:"phone"`
+	Bio         string          `json:"bio" bson:"bio"`
+	Password    string          `json:"-" bson:"password"`
+	Preferences UserPreferences `json:"preferences" bson:"preferences"`
+	CreatedAt   time.Time       `json:"createdAt" bson:"createdAt"`
+	UpdatedAt   time.Time       `json:"updatedAt" bson:"updatedAt"`
 }
 
 type CreateUserRequest struct {
@@ -78,8 +78,12 @@ func (u *UserModel) CreateUser(req *CreateUserRequest) (*User, error) {
 		return nil, err
 	}
 
+	// Generate UUID for the user
+	userID := uuid.New().String()
+
 	// Create user
 	user := &User{
+		ID:       userID,
 		Name:     req.Name,
 		Username: req.Username,
 		Email:    req.Email,
@@ -97,12 +101,11 @@ func (u *UserModel) CreateUser(req *CreateUserRequest) (*User, error) {
 		UpdatedAt: time.Now(),
 	}
 
-	result, err := u.collection.InsertOne(context.Background(), user)
+	_, err = u.collection.InsertOne(context.Background(), user)
 	if err != nil {
 		return nil, err
 	}
 
-	user.ID = result.InsertedID.(primitive.ObjectID)
 	return user, nil
 }
 
@@ -124,7 +127,7 @@ func (u *UserModel) GetUserByUsername(username string) (*User, error) {
 	return user, nil
 }
 
-func (u *UserModel) GetUserByID(id primitive.ObjectID) (*User, error) {
+func (u *UserModel) GetUserByID(id string) (*User, error) {
 	user := &User{}
 	err := u.collection.FindOne(context.Background(), bson.M{"_id": id}).Decode(user)
 	if err != nil {
@@ -138,7 +141,7 @@ func (u *UserModel) ValidatePassword(user *User, password string) bool {
 	return err == nil
 }
 
-func (u *UserModel) UpdateUser(id primitive.ObjectID, updates bson.M) error {
+func (u *UserModel) UpdateUser(id string, updates bson.M) error {
 	updates["updatedAt"] = time.Now()
 	_, err := u.collection.UpdateOne(context.Background(), bson.M{"_id": id}, bson.M{"$set": updates})
 	return err
@@ -153,7 +156,7 @@ type DeleteAccountRequest struct {
 	Password string `json:"password" binding:"required"`
 }
 
-func (u *UserModel) ChangePassword(userID primitive.ObjectID, currentPassword, newPassword string) error {
+func (u *UserModel) ChangePassword(userID string, currentPassword, newPassword string) error {
 	// Get user
 	user, err := u.GetUserByID(userID)
 	if err != nil {
@@ -180,7 +183,7 @@ func (u *UserModel) ChangePassword(userID primitive.ObjectID, currentPassword, n
 	return u.UpdateUser(userID, bson.M{"password": string(hashedPassword)})
 }
 
-func (u *UserModel) DeleteAccount(userID primitive.ObjectID, password string) error {
+func (u *UserModel) DeleteAccount(userID string, password string) error {
 	// Get user
 	user, err := u.GetUserByID(userID)
 	if err != nil {

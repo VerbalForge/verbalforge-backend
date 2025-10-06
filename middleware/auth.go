@@ -6,12 +6,12 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type Claims struct {
-	UserID primitive.ObjectID `json:"user_id"`
-	Email  string             `json:"email"`
+	UserID   string `json:"user_id"`
+	Email    string `json:"email"`
+	Username string `json:"username"`
 	jwt.RegisteredClaims
 }
 
@@ -54,6 +54,7 @@ func AuthRequired(jwtSecret string) gin.HandlerFunc {
 		// Set user info in context
 		c.Set("userID", claims.UserID)
 		c.Set("userEmail", claims.Email)
+		c.Set("username", claims.Username)
 		c.Next()
 	}
 }

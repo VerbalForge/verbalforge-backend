@@ -16,6 +16,7 @@ func SetupRouter() *gin.Engine {
 	controllers.InitializeFileController(AppConfig.UploadDir)
 	controllers.InitializeQuestionController(DB)
 	controllers.InitializePassageController(DB)
+	controllers.InitializeUserQuestionController(DB)
 
 	router := gin.Default()
 
@@ -51,6 +52,14 @@ func SetupRouter() *gin.Engine {
 		user.GET("/preferences", controllers.GetPreferences)
 		user.PATCH("/preferences", controllers.UpdatePreference)
 		user.PATCH("/theme", controllers.UpdateTheme)
+
+		// User question progress routes
+		user.POST("/questions/:question_id/attempt", controllers.SubmitQuestionAttempt)
+		user.POST("/passages/:passage_id/attempt", controllers.SubmitPassageAttempt)
+		user.GET("/questions/:question_id/progress", controllers.GetQuestionProgress)
+		user.GET("/passages/:passage_id/progress", controllers.GetPassageProgress)
+		user.POST("/questions/progress/bulk", controllers.GetBulkQuestionProgress)
+		user.POST("/passages/progress/bulk", controllers.GetBulkPassageProgress)
 	}
 
 	// Question routes
