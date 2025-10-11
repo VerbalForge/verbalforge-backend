@@ -66,7 +66,8 @@ func (r *UserRepository) Create(req *models.CreateUserRequest) (*models.User, er
 				Progress:    true,
 				Leaderboard: true,
 			},
-			Theme: "light",
+			Theme:    "light",
+			Timezone: req.Timezone, // Save user's timezone from registration
 		},
 		TotalXP:       0,
 		TotalSolved:   0,

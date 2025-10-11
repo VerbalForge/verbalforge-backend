@@ -41,7 +41,8 @@ const (
 // QuestionActivityMetadata represents metadata for question activity (attempted or solved)
 type QuestionActivityMetadata struct {
 	QuestionID      string `bson:"question_id" json:"questionId"`
-	Solved          bool   `bson:"solved" json:"solved"` // false = attempted, true = solved
+	QuestionText    string `bson:"question_text" json:"questionText"` // First 150 chars of question
+	Solved          bool   `bson:"solved" json:"solved"`              // false = attempted, true = solved
 	PassageID       string `bson:"passage_id,omitempty" json:"passageId,omitempty"`
 	DifficultyLevel string `bson:"difficulty_level" json:"difficulty_level"`
 	QuestionType    string `bson:"question_type" json:"question_type"`
@@ -51,13 +52,13 @@ type QuestionActivityMetadata struct {
 
 // DiscussionActivityMetadata represents metadata for all discussion-related activities
 type DiscussionActivityMetadata struct {
-	DiscussionID string               `bson:"discussion_id" json:"discussionId"`
-	CommentID    string               `bson:"comment_id,omitempty" json:"commentId,omitempty"` // For comment activities
-	ParentID     string               `bson:"parent_id,omitempty" json:"parentId,omitempty"`   // For nested comments
-	Title        string               `bson:"title,omitempty" json:"title,omitempty"`          // For created/updated
-	Tags         []string             `bson:"tags,omitempty" json:"tags,omitempty"`            // For created
-	ActionType   DiscussionActionType `bson:"action_type" json:"actionType"`                   // Type of discussion action
-	IsComment    bool                 `bson:"is_comment" json:"isComment"`                     // true for comment actions, false for discussion actions
+	DiscussionID    string               `bson:"discussion_id" json:"discussionId"`
+	DiscussionTitle string               `bson:"discussion_title" json:"discussionTitle"`         // First 150 chars of title
+	CommentID       string               `bson:"comment_id,omitempty" json:"commentId,omitempty"` // For comment activities
+	ParentID        string               `bson:"parent_id,omitempty" json:"parentId,omitempty"`   // For nested comments
+	Tags            []string             `bson:"tags,omitempty" json:"tags,omitempty"`            // For created
+	ActionType      DiscussionActionType `bson:"action_type" json:"actionType"`                   // Type of discussion action
+	IsComment       bool                 `bson:"is_comment" json:"isComment"`                     // true for comment actions, false for discussion actions
 }
 
 // LikedMetadata represents metadata for liked activity (deprecated - use DiscussionActivityMetadata)

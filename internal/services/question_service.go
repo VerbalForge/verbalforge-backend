@@ -281,8 +281,14 @@ func (s *QuestionService) SubmitQuestionAttempt(userID, questionID string, req *
 	}
 
 	// Log question activity (works for both attempted and solved)
+	questionText := question.QuestionText
+	if len(questionText) > 150 {
+		questionText = questionText[:150] + "..."
+	}
+
 	activityMeta := models.QuestionActivityMetadata{
 		QuestionID:      questionID,
+		QuestionText:    questionText,
 		Solved:          solved,
 		DifficultyLevel: question.DifficultyLevel,
 		QuestionType:    question.QuestionType,

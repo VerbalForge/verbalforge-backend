@@ -27,16 +27,16 @@ func SetupRouter(db *mongo.Database) *gin.Engine {
 	// Initialize services
 	authService := services.NewAuthService(userRepo, cfg.JWTSecret)
 	activitySummaryService := services.NewUserActivitySummaryService(userActivitySummaryRepo)
-	activityService := services.NewUserActivityService(userActivityRepo, activitySummaryService)
+	activityService := services.NewUserActivityService(userActivityRepo, activitySummaryService, userRepo)
 	userService := services.NewUserService(userRepo, userQuestionRepo, activityService)
 	questionService := services.NewQuestionService(questionRepo, userQuestionRepo, passageRepo, userRepo, activityService)
 	passageService := services.NewPassageService(passageRepo, questionRepo, userQuestionRepo, userRepo, activityService)
-	discussionService := services.NewDiscussionService(discussionRepo, userRepo)
+	discussionService := services.NewDiscussionService(discussionRepo, userRepo, questionRepo, passageRepo, activityService)
 	fileService := services.NewFileService(cfg.UploadDir)
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(authService)
-	userHandler := handlers.NewUserHandler(userService)
+	userHandler := handlers.NewUserHandler(userService, activityService)
 	questionHandler := handlers.NewQuestionHandler(questionService)
 	passageHandler := handlers.NewPassageHandler(passageService)
 	discussionHandler := handlers.NewDiscussionHandler(discussionService)
@@ -91,6 +91,7 @@ func SetupRouter(db *mongo.Database) *gin.Engine {
 
 	// Profile routes (public access with privacy controls)
 	profile := router.Group("/profile")
+	profile.Use(middleware.AuthMiddleware(cfg.JWTSecret))
 	{
 		profile.GET("/:username", userHandler.GetUserProfile)
 		profile.POST("/:username/view", userHandler.IncrementProfileView)

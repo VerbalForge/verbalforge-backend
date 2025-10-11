@@ -9,13 +9,15 @@ import (
 type UserActivityService struct {
 	activityRepo   *repository.UserActivityRepository
 	summaryService *UserActivitySummaryService
+	userRepo       *repository.UserRepository
 }
 
 // NewUserActivityService creates a new user activity service
-func NewUserActivityService(activityRepo *repository.UserActivityRepository, summaryService *UserActivitySummaryService) *UserActivityService {
+func NewUserActivityService(activityRepo *repository.UserActivityRepository, summaryService *UserActivitySummaryService, userRepo *repository.UserRepository) *UserActivityService {
 	return &UserActivityService{
 		activityRepo:   activityRepo,
 		summaryService: summaryService,
+		userRepo:       userRepo,
 	}
 }
 
@@ -38,7 +40,16 @@ func (s *UserActivityService) LogQuestionActivity(userID string, meta models.Que
 
 	// Update daily summary (if summary service is available)
 	if s.summaryService != nil {
-		_ = s.summaryService.UpdateDailySummary(userID, meta.Solved, meta.XPGained, meta.QuestionID)
+		// Get user's timezone preference
+		timezone := "UTC" // Default
+		if s.userRepo != nil {
+			user, err := s.userRepo.FindByID(userID)
+			if err == nil && user != nil && user.Preferences.Timezone != "" {
+				timezone = user.Preferences.Timezone
+			}
+		}
+
+		_ = s.summaryService.UpdateDailySummary(userID, meta.Solved, meta.XPGained, meta.QuestionID, timezone)
 		// Don't fail the activity log if summary update fails
 	}
 

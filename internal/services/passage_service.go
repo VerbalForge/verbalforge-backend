@@ -234,8 +234,14 @@ func (s *PassageService) SubmitPassageAttempt(userID, passageID string, req *mod
 			results = append(results, *userQuestion)
 
 			// Log activity for this question (works for both attempted and solved)
+			questionText := question.QuestionText
+			if len(questionText) > 150 {
+				questionText = questionText[:150] + "..."
+			}
+
 			activityMeta := models.QuestionActivityMetadata{
 				QuestionID:      attempt.QuestionID,
+				QuestionText:    questionText,
 				Solved:          attempt.Solved,
 				PassageID:       passageID,
 				DifficultyLevel: question.DifficultyLevel,

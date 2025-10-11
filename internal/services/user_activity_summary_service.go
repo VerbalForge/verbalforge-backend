@@ -20,9 +20,20 @@ func NewUserActivitySummaryService(summaryRepo *repository.UserActivitySummaryRe
 }
 
 // UpdateDailySummary updates the daily summary for question activities
-func (s *UserActivitySummaryService) UpdateDailySummary(userID string, questionSolved bool, xpGained int, questionID string) error {
-	today := time.Now().UTC().Format("2006-01-02")
-	return s.summaryRepo.UpsertDailyActivity(userID, today, questionSolved, xpGained, questionID)
+// Uses timezone to bucket activities by the user's local date
+func (s *UserActivitySummaryService) UpdateDailySummary(userID string, questionSolved bool, xpGained int, questionID string, timezone string) error {
+	// Get current time in user's timezone
+	loc, err := time.LoadLocation(timezone)
+	if err != nil {
+		// Fallback to UTC if timezone is invalid
+		loc = time.UTC
+	}
+
+	// Get today's date in user's timezone
+	now := time.Now().In(loc)
+	todayInUserTZ := now.Format("2006-01-02")
+
+	return s.summaryRepo.UpsertDailyActivity(userID, todayInUserTZ, questionSolved, xpGained, questionID)
 }
 
 // GetUserSummary retrieves the complete activity summary for a user

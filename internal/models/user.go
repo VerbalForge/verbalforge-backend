@@ -11,8 +11,9 @@ type ProfilePreferences struct {
 
 // UserPreferences represents user application preferences
 type UserPreferences struct {
-	Profile ProfilePreferences `json:"profile" bson:"profile"`
-	Theme   string             `json:"theme" bson:"theme"`
+	Profile  ProfilePreferences `json:"profile" bson:"profile"`
+	Theme    string             `json:"theme" bson:"theme"`
+	Timezone string             `json:"timezone" bson:"timezone"` // User's timezone (e.g., "Asia/Kolkata")
 }
 
 // User represents a user in the system
@@ -44,6 +45,7 @@ type CreateUserRequest struct {
 	Email    string `json:"email" binding:"required,email"`
 	Phone    string `json:"phone" binding:"required,min=10"`
 	Password string `json:"password" binding:"required,min=6"`
+	Timezone string `json:"timezone"` // Optional: user's timezone (e.g., "Asia/Kolkata")
 }
 
 // LoginRequest represents the login request

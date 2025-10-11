@@ -14,13 +14,15 @@ import (
 
 // UserHandler handles user HTTP requests
 type UserHandler struct {
-	userService *services.UserService
+	userService     *services.UserService
+	activityService *services.UserActivityService
 }
 
 // NewUserHandler creates a new user handler
-func NewUserHandler(userService *services.UserService) *UserHandler {
+func NewUserHandler(userService *services.UserService, activityService *services.UserActivityService) *UserHandler {
 	return &UserHandler{
-		userService: userService,
+		userService:     userService,
+		activityService: activityService,
 	}
 }
 
@@ -50,8 +52,12 @@ func (h *UserHandler) GetUserProfile(c *gin.Context) {
 		return
 	}
 
-	// Check privacy settings
-	if !profile.User.Preferences.Profile.Visibility {
+	// Check if the requesting user is viewing their own profile
+	requestingUserID, exists := middleware.GetUserID(c)
+	isOwnProfile := exists && requestingUserID == profile.User.ID
+
+	// Check privacy settings - allow access if it's the user's own profile
+	if !profile.User.Preferences.Profile.Visibility && !isOwnProfile {
 		utils.ForbiddenResponse(c, "This profile is private")
 		return
 	}
@@ -200,13 +206,21 @@ func (h *UserHandler) GetUserRecentActivity(c *gin.Context) {
 		}
 	}
 
-	activity, err := h.userService.GetRecentActivity(username, limit)
+	// Get user by username
+	profile, err := h.userService.GetProfileByUsername(username)
 	if err != nil {
-		utils.NotFoundResponse(c, err.Error())
+		utils.NotFoundResponse(c, "User not found")
 		return
 	}
 
-	utils.SuccessResponse(c, http.StatusOK, activity)
+	// Get activities from activity service
+	activities, err := h.activityService.GetRecentActivities(profile.User.ID, limit)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to fetch activities")
+		return
+	}
+
+	utils.SuccessResponse(c, http.StatusOK, activities)
 }
 
 // GetLeaderboard retrieves the leaderboard

@@ -14,33 +14,46 @@ type Comment struct {
 	UpdatedAt time.Time `json:"updatedAt" bson:"updatedAt"`
 }
 
+// LinkedQuestion represents a question linked to a discussion
+type LinkedQuestion struct {
+	QuestionID      string `json:"questionId" bson:"questionId"`
+	PassageID       string `json:"passageId,omitempty" bson:"passageId,omitempty"`
+	QuestionText    string `json:"questionText" bson:"questionText"`
+	QuestionType    string `json:"questionType" bson:"questionType"`
+	DifficultyLevel string `json:"difficultyLevel" bson:"difficultyLevel"`
+	PassageTitle    string `json:"passageTitle,omitempty" bson:"passageTitle,omitempty"`
+}
+
 // Discussion represents a discussion topic
 type Discussion struct {
-	ID            string    `json:"id" bson:"_id,omitempty"`
-	Title         string    `json:"title" bson:"title"`
-	Description   string    `json:"description" bson:"description"` // Rich text HTML
-	QuestionIDs   []string  `json:"questionIds" bson:"questionIds"`
-	CreatedBy     string    `json:"createdBy" bson:"createdBy"`
-	CreatedByName string    `json:"createdByName" bson:"createdByName"`
-	CreatedAt     time.Time `json:"createdAt" bson:"createdAt"`
-	UpdatedAt     time.Time `json:"updatedAt" bson:"updatedAt"`
-	Comments      []Comment `json:"comments" bson:"comments"`
-	Views         int       `json:"views" bson:"views"`
-	ViewedBy      []string  `json:"viewedBy" bson:"viewedBy"`
-	Likes         int       `json:"likes" bson:"likes"`
-	LikedBy       []string  `json:"likedBy" bson:"likedBy"`
-	Tags          []string  `json:"tags" bson:"tags"`
-	IsPinned      bool      `json:"isPinned" bson:"isPinned"`
-	IsLocked      bool      `json:"isLocked" bson:"isLocked"`
-	CommentCount  int       `json:"commentCount" bson:"commentCount"`
+	ID             string          `json:"id" bson:"_id,omitempty"`
+	Title          string          `json:"title" bson:"title"`
+	Description    string          `json:"description" bson:"description"`       // Rich text HTML
+	QuestionIDs    []string        `json:"questionIds" bson:"questionIds"`       // Deprecated, kept for backward compatibility
+	DiscussionType string          `json:"discussionType" bson:"discussionType"` // "general" or "question_linked"
+	LinkedQuestion *LinkedQuestion `json:"linkedQuestion,omitempty" bson:"linkedQuestion,omitempty"`
+	CreatedBy      string          `json:"createdBy" bson:"createdBy"`
+	CreatedByName  string          `json:"createdByName" bson:"createdByName"`
+	CreatedAt      time.Time       `json:"createdAt" bson:"createdAt"`
+	UpdatedAt      time.Time       `json:"updatedAt" bson:"updatedAt"`
+	Comments       []Comment       `json:"comments" bson:"comments"`
+	Views          int             `json:"views" bson:"views"`
+	ViewedBy       []string        `json:"viewedBy" bson:"viewedBy"`
+	Likes          int             `json:"likes" bson:"likes"`
+	LikedBy        []string        `json:"likedBy" bson:"likedBy"`
+	Tags           []string        `json:"tags" bson:"tags"`
+	IsPinned       bool            `json:"isPinned" bson:"isPinned"`
+	IsLocked       bool            `json:"isLocked" bson:"isLocked"`
+	CommentCount   int             `json:"commentCount" bson:"commentCount"`
 }
 
 // CreateDiscussionRequest represents the request to create a discussion
 type CreateDiscussionRequest struct {
 	Title       string   `json:"title" binding:"required,min=5,max=200"`
 	Description string   `json:"description" binding:"required,min=10"`
-	QuestionIDs []string `json:"questionIds"`
+	QuestionIDs []string `json:"questionIds"` // Deprecated
 	Tags        []string `json:"tags"`
+	QuestionID  string   `json:"questionId,omitempty"` // Optional: if provided, creates a question-linked discussion
 }
 
 // UpdateDiscussionRequest represents the request to update a discussion

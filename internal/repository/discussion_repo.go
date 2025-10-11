@@ -105,6 +105,11 @@ func (r *DiscussionRepository) Create(discussion *models.Discussion) error {
 	discussion.IsPinned = false
 	discussion.IsLocked = false
 
+	// Default to general if not specified (for backward compatibility)
+	if discussion.DiscussionType == "" {
+		discussion.DiscussionType = "general"
+	}
+
 	if discussion.QuestionIDs == nil {
 		discussion.QuestionIDs = []string{}
 	}
