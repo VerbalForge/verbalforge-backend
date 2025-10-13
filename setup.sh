@@ -24,7 +24,8 @@ sudo cp -r . $APP_DIR/
 sudo chown -R $SERVICE_USER:$SERVICE_USER $APP_DIR
 
 cd $APP_DIR
-sudo -u $SERVICE_USER go build -o $APP_NAME main.go
+sudo -u $SERVICE_USER go mod download
+sudo -u $SERVICE_USER go build -o $APP_NAME .
 
 sudo tee /etc/systemd/system/$APP_NAME.service > /dev/null <<EOF
 [Unit]
