@@ -5,6 +5,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 
 	"verbalforge-backend/internal/config"
+	"verbalforge-backend/internal/controllers"
 	"verbalforge-backend/internal/handlers"
 	"verbalforge-backend/internal/middleware"
 	"verbalforge-backend/internal/repository"
@@ -23,6 +24,8 @@ func SetupRouter(db *mongo.Database) *gin.Engine {
 	userQuestionRepo := repository.NewUserQuestionRepository(db)
 	userActivityRepo := repository.NewUserActivityRepository(db)
 	userActivitySummaryRepo := repository.NewUserActivitySummaryRepository(db)
+	wordRepo := repository.NewWordRepository(db)
+	userWordRepo := repository.NewUserWordRepository(db)
 
 	// Initialize services
 	authService := services.NewAuthService(userRepo, cfg.JWTSecret)
@@ -33,6 +36,8 @@ func SetupRouter(db *mongo.Database) *gin.Engine {
 	passageService := services.NewPassageService(passageRepo, questionRepo, userQuestionRepo, userRepo, activityService)
 	discussionService := services.NewDiscussionService(discussionRepo, userRepo, questionRepo, passageRepo, activityService)
 	fileService := services.NewFileService(cfg.UploadDir)
+	wordService := services.NewWordService(wordRepo)
+	userWordService := services.NewUserWordService(userWordRepo)
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(authService)
@@ -41,6 +46,9 @@ func SetupRouter(db *mongo.Database) *gin.Engine {
 	passageHandler := handlers.NewPassageHandler(passageService)
 	discussionHandler := handlers.NewDiscussionHandler(discussionService)
 	fileHandler := handlers.NewFileHandler(fileService)
+
+	// Initialize controllers
+	wordController := controllers.NewWordController(wordService, userWordService)
 
 	// Create router
 	router := gin.Default()
@@ -149,6 +157,19 @@ func SetupRouter(db *mongo.Database) *gin.Engine {
 
 	// User's discussions route
 	router.GET("/profile/:username/discussions", middleware.AuthMiddleware(cfg.JWTSecret), discussionHandler.GetUserDiscussions)
+
+	// Word routes (for Learn feature)
+	words := router.Group("/words")
+	words.Use(middleware.AuthMiddleware(cfg.JWTSecret))
+	{
+		words.GET("", wordController.GetWords)
+		words.GET("/sources", wordController.GetSources)
+		words.GET("/search", wordController.SearchWords)
+		words.GET("/progress", wordController.GetUserProgress)
+		words.POST("/progress/reset", wordController.ResetUserProgress)
+		words.GET("/:id", wordController.GetWordByID)
+		words.POST("/:id/status", wordController.UpdateWordStatus)
+	}
 
 	// Serve uploaded files statically
 	router.Static("/uploads", cfg.UploadDir)
