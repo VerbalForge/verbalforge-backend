@@ -7,7 +7,13 @@ APP_DIR="/opt/$APP_NAME"
 SERVICE_USER="verbalforge"
 
 sudo apt-get update
-sudo apt-get install -y golang-go nginx certbot python3-certbot-nginx gnupg curl
+sudo apt-get install -y nginx certbot python3-certbot-nginx gnupg curl wget
+
+wget https://go.dev/dl/go1.23.2.linux-amd64.tar.gz
+sudo rm -rf /usr/local/go
+sudo tar -C /usr/local -xzf go1.23.2.linux-amd64.tar.gz
+rm go1.23.2.linux-amd64.tar.gz
+export PATH=$PATH:/usr/local/go/bin
 
 curl -fsSL https://pgp.mongodb.com/server-7.0.asc | sudo gpg --dearmor -o /usr/share/keyrings/mongodb-server-7.0.gpg
 echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/7.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-7.0.list
@@ -24,8 +30,8 @@ sudo cp -r . $APP_DIR/
 sudo chown -R $SERVICE_USER:$SERVICE_USER $APP_DIR
 
 cd $APP_DIR
-sudo -u $SERVICE_USER go mod download
-sudo -u $SERVICE_USER go build -o $APP_NAME .
+sudo -u $SERVICE_USER /usr/local/go/bin/go mod download
+sudo -u $SERVICE_USER /usr/local/go/bin/go build -o $APP_NAME ./cmd/server
 
 sudo tee /etc/systemd/system/$APP_NAME.service > /dev/null <<EOF
 [Unit]
