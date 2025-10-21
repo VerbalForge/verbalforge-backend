@@ -83,6 +83,11 @@ $DOMAIN {
 }
 EOF
 
+# Create log directory
+echo "📁 Creating log directory..."
+mkdir -p /var/log/caddy
+chown caddy:caddy /var/log/caddy
+
 # Test Caddy configuration
 echo "✅ Testing Caddy configuration..."
 caddy validate --config /etc/caddy/Caddyfile
