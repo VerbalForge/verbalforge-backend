@@ -12,9 +12,10 @@ func CORSMiddleware() gin.HandlerFunc {
 	cfg := config.GetConfig()
 
 	corsConfig := cors.DefaultConfig()
-	corsConfig.AllowOrigins = []string{cfg.FrontendURL}
+	corsConfig.AllowOrigins = cfg.FrontendURLs
 	corsConfig.AllowMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"}
 	corsConfig.AllowHeaders = []string{"Origin", "Content-Type", "Authorization"}
+	corsConfig.AllowCredentials = true
 
 	return cors.New(corsConfig)
 }

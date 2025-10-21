@@ -2,27 +2,42 @@ package config
 
 import (
 	"os"
+	"strings"
 )
 
 // Config holds all application configuration
 type Config struct {
-	MongoURI    string
-	JWTSecret   string
-	FrontendURL string
-	UploadDir   string
-	Port        string
+	MongoURI     string
+	JWTSecret    string
+	FrontendURLs []string
+	UploadDir    string
+	Port         string
 }
 
 var AppConfig *Config
 
 // Load initializes the application configuration from environment variables
 func Load() *Config {
+	// Parse comma-separated FRONTEND_URLS
+	var frontendURLs []string
+	if urlsEnv := os.Getenv("FRONTEND_URLS"); urlsEnv != "" {
+		for _, url := range strings.Split(urlsEnv, ",") {
+			trimmed := strings.TrimSpace(url)
+			if trimmed != "" {
+				frontendURLs = append(frontendURLs, trimmed)
+			}
+		}
+	} else {
+		// Default to localhost
+		frontendURLs = []string{"http://localhost:3000"}
+	}
+
 	AppConfig = &Config{
-		MongoURI:    getEnv("MONGO_URI", "mongodb://localhost:27017/verbalforge"),
-		JWTSecret:   getEnv("JWT_SECRET", "your-super-secret-jwt-key-change-this-in-production"),
-		FrontendURL: getEnv("FRONTEND_URL", "http://localhost:3000"),
-		UploadDir:   getEnv("UPLOAD_DIR", "./uploads"),
-		Port:        getEnv("PORT", "8080"),
+		MongoURI:     getEnv("MONGO_URI", "mongodb://localhost:27017/verbalforge"),
+		JWTSecret:    getEnv("JWT_SECRET", "your-super-secret-jwt-key-change-this-in-production"),
+		FrontendURLs: frontendURLs,
+		UploadDir:    getEnv("UPLOAD_DIR", "./uploads"),
+		Port:         getEnv("PORT", "8080"),
 	}
 	return AppConfig
 }

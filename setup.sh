@@ -119,25 +119,19 @@ sudo systemctl restart $APP_NAME
 echo "✅ Backend service restarted!"
 
 # ============================================================================
-# CADDY HTTPS SETUP (if not configured or failed)
+# CADDY HTTPS SETUP (runs every time to capture config changes)
 # ============================================================================
-CADDY_CONFIGURED=false
-if systemctl is-active --quiet caddy && [ -f /etc/caddy/Caddyfile ] && grep -q "$DOMAIN" /etc/caddy/Caddyfile 2>/dev/null; then
-    CADDY_CONFIGURED=true
+echo "🔒 Configuring Caddy reverse proxy..."
+
+# Stop Nginx if running (to free port 80) - first time only
+if systemctl is-active --quiet nginx; then
+    echo "⚠️  Stopping Nginx to free port 80..."
+    sudo systemctl stop nginx
+    sudo systemctl disable nginx
 fi
 
-if [ "$CADDY_CONFIGURED" = false ]; then
-    echo "🔒 Setting up HTTPS with Caddy..."
-    
-    # Stop Nginx if running (to free port 80)
-    if systemctl is-active --quiet nginx; then
-        echo "⚠️  Stopping Nginx to free port 80..."
-        sudo systemctl stop nginx
-        sudo systemctl disable nginx
-    fi
-    
-    # Create Caddyfile
-    sudo tee /etc/caddy/Caddyfile > /dev/null <<EOF
+# Always update Caddyfile to capture any configuration changes
+sudo tee /etc/caddy/Caddyfile > /dev/null <<EOF
 {
     email $EMAIL
     auto_https disable_redirects
@@ -150,20 +144,6 @@ $DOMAIN {
         header_up X-Forwarded-For {remote_host}
         header_up X-Forwarded-Proto {scheme}
     }
-
-    # CORS headers
-    header {
-        Access-Control-Allow-Origin "https://black-dune-04f31470f.3.azurestaticapps.net"
-        Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS, PATCH"
-        Access-Control-Allow-Headers "Origin, Content-Type, Authorization"
-        Access-Control-Allow-Credentials "true"
-    }
-
-    # Handle CORS preflight
-    @options {
-        method OPTIONS
-    }
-    respond @options 204
 
     # Security headers
     header {
@@ -178,22 +158,30 @@ $DOMAIN {
     }
 }
 EOF
-    
-    # Test and start Caddy
-    sudo caddy validate --config /etc/caddy/Caddyfile
-    sudo systemctl enable caddy
-    sudo systemctl restart caddy
-    
-    # Wait a moment and check if Caddy started successfully
-    sleep 2
-    if systemctl is-active --quiet caddy; then
-        echo "✅ HTTPS configured successfully!"
-    else
-        echo "❌ Caddy failed to start. Check logs with: sudo journalctl -u caddy -n 50"
-        exit 1
-    fi
+
+# Validate Caddyfile syntax
+echo "🔍 Validating Caddyfile..."
+sudo caddy validate --config /etc/caddy/Caddyfile
+
+# Enable and reload Caddy (reload preserves existing connections and certificates)
+sudo systemctl enable caddy
+
+# Use reload if Caddy is already running, otherwise start it
+if systemctl is-active --quiet caddy; then
+    echo "🔄 Reloading Caddy configuration..."
+    sudo systemctl reload caddy
 else
-    echo "✅ Caddy already configured and running"
+    echo "🚀 Starting Caddy..."
+    sudo systemctl start caddy
+fi
+
+# Wait a moment and check if Caddy is running successfully
+sleep 2
+if systemctl is-active --quiet caddy; then
+    echo "✅ Caddy configured and running successfully!"
+else
+    echo "❌ Caddy failed to start. Check logs with: sudo journalctl -u caddy -n 50"
+    exit 1
 fi
 
 # ============================================================================
@@ -213,8 +201,11 @@ if [ "$FIRST_TIME_SETUP" = true ]; then
     echo "   1. Ensure DNS points $DOMAIN to this server"
     echo "   2. Wait 1-2 minutes for SSL certificate"
     echo "   3. Test: curl https://$DOMAIN/health"
-    echo "   4. Update GitHub secret: NEXT_PUBLIC_API_URL=https://$DOMAIN"
-    echo "   5. Update backend .env: FRONTEND_URL=https://black-dune-04f31470f.3.azurestaticapps.net"
+    echo "   4. Update GitHub secrets with required environment variables:"
+    echo "      - MONGODB_URI"
+    echo "      - JWT_SECRET"
+    echo "      - FRONTEND_URLS (comma-separated list of allowed origins)"
+    echo "      - LETS_ENCRYPT_EMAIL"
 else
     echo "🔄 Deployment complete!"
     echo "   Backend is running on https://$DOMAIN"

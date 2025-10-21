@@ -38,7 +38,15 @@ jobs:
             echo "📥 Pulling latest changes..."
             git pull origin main
             
-            echo "🚀 Running deployment..."
+            echo "� Creating .env file with secrets..."
+            cat > .env <<EOF
+            MONGODB_URI=${{ secrets.MONGODB_URI }}
+            JWT_SECRET=${{ secrets.JWT_SECRET }}
+            PORT=8080
+            FRONTEND_URLS=${{ secrets.FRONTEND_URLS }}
+            EOF
+            
+            echo "�🚀 Running deployment..."
             bash setup.sh api.verbalforge.xyz ${{ secrets.LETS_ENCRYPT_EMAIL }}
             
             echo "✅ Deployment complete!"
