@@ -83,7 +83,7 @@ cd $APP_DIR
 # Build the application
 export PATH=$PATH:/usr/local/go/bin
 /usr/local/go/bin/go mod download
-/usr/local/go/bin/go build -o $APP_NAME
+/usr/local/go/bin/go build -o $APP_NAME ./cmd/server
 
 # Set ownership
 sudo chown -R $SERVICE_USER:$SERVICE_USER $APP_DIR
@@ -119,10 +119,22 @@ sudo systemctl restart $APP_NAME
 echo "✅ Backend service restarted!"
 
 # ============================================================================
-# CADDY HTTPS SETUP (first-time only)
+# CADDY HTTPS SETUP (if not configured or failed)
 # ============================================================================
-if [ "$FIRST_TIME_SETUP" = true ]; then
+CADDY_CONFIGURED=false
+if systemctl is-active --quiet caddy && [ -f /etc/caddy/Caddyfile ] && grep -q "$DOMAIN" /etc/caddy/Caddyfile 2>/dev/null; then
+    CADDY_CONFIGURED=true
+fi
+
+if [ "$CADDY_CONFIGURED" = false ]; then
     echo "🔒 Setting up HTTPS with Caddy..."
+    
+    # Stop Nginx if running (to free port 80)
+    if systemctl is-active --quiet nginx; then
+        echo "⚠️  Stopping Nginx to free port 80..."
+        sudo systemctl stop nginx
+        sudo systemctl disable nginx
+    fi
     
     # Create Caddyfile
     sudo tee /etc/caddy/Caddyfile > /dev/null <<EOF
@@ -172,7 +184,16 @@ EOF
     sudo systemctl enable caddy
     sudo systemctl restart caddy
     
-    echo "✅ HTTPS configured successfully!"
+    # Wait a moment and check if Caddy started successfully
+    sleep 2
+    if systemctl is-active --quiet caddy; then
+        echo "✅ HTTPS configured successfully!"
+    else
+        echo "❌ Caddy failed to start. Check logs with: sudo journalctl -u caddy -n 50"
+        exit 1
+    fi
+else
+    echo "✅ Caddy already configured and running"
 fi
 
 # ============================================================================
