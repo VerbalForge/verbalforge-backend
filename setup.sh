@@ -2,41 +2,102 @@
 
 set -e
 
+# Configuration
 APP_NAME="verbalforge-backend"
-APP_DIR="/opt/$APP_NAME"
+APP_DIR="$HOME/$APP_NAME"
 SERVICE_USER="verbalforge"
+DOMAIN="${1:-api.verbalforge.xyz}"
+EMAIL="${2:-newrex2002@gmail.com}"
+BACKEND_PORT="8080"
 
-sudo apt-get update
-sudo apt-get install -y nginx certbot python3-certbot-nginx gnupg curl wget
+# Detect if this is first-time setup or deployment
+FIRST_TIME_SETUP=false
+if [ ! -f "/etc/systemd/system/$APP_NAME.service" ]; then
+    FIRST_TIME_SETUP=true
+fi
 
-wget https://go.dev/dl/go1.23.2.linux-amd64.tar.gz
-sudo rm -rf /usr/local/go
-sudo tar -C /usr/local -xzf go1.23.2.linux-amd64.tar.gz
-rm go1.23.2.linux-amd64.tar.gz
+echo "🚀 VerbalForge Backend Setup"
+echo "   Mode: $([ "$FIRST_TIME_SETUP" = true ] && echo "First-time installation" || echo "Update deployment")"
+echo "   Domain: $DOMAIN"
+echo "   Email: $EMAIL"
+echo ""
+
+# ============================================================================
+# FIRST-TIME SETUP ONLY
+# ============================================================================
+if [ "$FIRST_TIME_SETUP" = true ]; then
+    echo "📦 Installing dependencies..."
+    
+    # Update system
+    sudo apt-get update
+    sudo apt-get install -y gnupg curl wget git
+    
+    # Install Go
+    echo "📦 Installing Go 1.23.2..."
+    wget https://go.dev/dl/go1.23.2.linux-amd64.tar.gz
+    sudo rm -rf /usr/local/go
+    sudo tar -C /usr/local -xzf go1.23.2.linux-amd64.tar.gz
+    rm go1.23.2.linux-amd64.tar.gz
+    
+    # Add Go to PATH for current session
+    export PATH=$PATH:/usr/local/go/bin
+    
+    # Add Go to PATH permanently
+    if ! grep -q "/usr/local/go/bin" ~/.bashrc; then
+        echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
+    fi
+    
+    # Install MongoDB
+    echo "📦 Installing MongoDB..."
+    curl -fsSL https://pgp.mongodb.com/server-7.0.asc | sudo gpg --dearmor -o /usr/share/keyrings/mongodb-server-7.0.gpg
+    echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/7.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-7.0.list
+    sudo apt-get update
+    sudo apt-get install -y mongodb-org
+    
+    sudo systemctl enable mongod
+    sudo systemctl start mongod
+    
+    # Create service user
+    echo "👤 Creating service user..."
+    sudo useradd -r -s /bin/false $SERVICE_USER || true
+    
+    # Install Caddy
+    echo "📦 Installing Caddy..."
+    sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https
+    curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+    curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
+    sudo apt-get update
+    sudo apt-get install -y caddy
+    
+    echo "✅ Dependencies installed successfully!"
+fi
+
+# ============================================================================
+# BUILD AND DEPLOY (runs every time)
+# ============================================================================
+echo "🔨 Building application..."
+
+# Ensure we're in the app directory
+cd $APP_DIR
+
+# Build the application
 export PATH=$PATH:/usr/local/go/bin
+/usr/local/go/bin/go mod download
+/usr/local/go/bin/go build -o $APP_NAME
 
-curl -fsSL https://pgp.mongodb.com/server-7.0.asc | sudo gpg --dearmor -o /usr/share/keyrings/mongodb-server-7.0.gpg
-echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/7.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-7.0.list
-sudo apt-get update
-sudo apt-get install -y mongodb-org
-
-sudo systemctl enable mongod
-sudo systemctl start mongod
-
-sudo useradd -r -s /bin/false $SERVICE_USER || true
-
-sudo mkdir -p $APP_DIR
-sudo cp -r . $APP_DIR/
+# Set ownership
 sudo chown -R $SERVICE_USER:$SERVICE_USER $APP_DIR
 
-cd $APP_DIR
-sudo -u $SERVICE_USER /usr/local/go/bin/go mod download
-sudo -u $SERVICE_USER /usr/local/go/bin/go build -o $APP_NAME ./cmd/server
+# ============================================================================
+# SYSTEMD SERVICE SETUP
+# ============================================================================
+echo "⚙️  Configuring systemd service..."
 
 sudo tee /etc/systemd/system/$APP_NAME.service > /dev/null <<EOF
 [Unit]
 Description=VerbalForge Backend API
-After=network.target
+After=network.target mongod.service
+Requires=mongod.service
 
 [Service]
 Type=simple
@@ -45,6 +106,7 @@ WorkingDirectory=$APP_DIR
 ExecStart=$APP_DIR/$APP_NAME
 Restart=always
 RestartSec=5
+Environment="PATH=/usr/local/go/bin:/usr/bin:/bin"
 
 [Install]
 WantedBy=multi-user.target
@@ -52,31 +114,88 @@ EOF
 
 sudo systemctl daemon-reload
 sudo systemctl enable $APP_NAME
-sudo systemctl start $APP_NAME
+sudo systemctl restart $APP_NAME
 
-sudo tee /etc/nginx/sites-available/$APP_NAME > /dev/null <<'EOF'
-server {
-    listen 80;
-    server_name _;
+echo "✅ Backend service restarted!"
 
-    location / {
-        proxy_pass http://localhost:8080;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_cache_bypass $http_upgrade;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+# ============================================================================
+# CADDY HTTPS SETUP (first-time only)
+# ============================================================================
+if [ "$FIRST_TIME_SETUP" = true ]; then
+    echo "🔒 Setting up HTTPS with Caddy..."
+    
+    # Create Caddyfile
+    sudo tee /etc/caddy/Caddyfile > /dev/null <<EOF
+{
+    email $EMAIL
+    auto_https disable_redirects
+}
+
+$DOMAIN {
+    # Reverse proxy to Go backend
+    reverse_proxy localhost:$BACKEND_PORT {
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+    }
+
+    # CORS headers
+    header {
+        Access-Control-Allow-Origin "https://black-dune-04f31470f.3.azurestaticapps.net"
+        Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+        Access-Control-Allow-Headers "Origin, Content-Type, Authorization"
+        Access-Control-Allow-Credentials "true"
+    }
+
+    # Handle CORS preflight
+    @options {
+        method OPTIONS
+    }
+    respond @options 204
+
+    # Security headers
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Frame-Options "SAMEORIGIN"
+        X-Content-Type-Options "nosniff"
+    }
+
+    # File upload limit
+    request_body {
+        max_size 10MB
     }
 }
 EOF
+    
+    # Test and start Caddy
+    sudo caddy validate --config /etc/caddy/Caddyfile
+    sudo systemctl enable caddy
+    sudo systemctl restart caddy
+    
+    echo "✅ HTTPS configured successfully!"
+fi
 
-sudo ln -sf /etc/nginx/sites-available/$APP_NAME /etc/nginx/sites-enabled/
-sudo rm -f /etc/nginx/sites-enabled/default
-sudo nginx -t
-sudo systemctl restart nginx
+# ============================================================================
+# SUMMARY
+# ============================================================================
+echo ""
+echo "✅ Setup complete!"
+echo ""
+echo "📊 Service Status:"
+sudo systemctl status $APP_NAME --no-pager -l | head -10
+echo ""
 
-echo "Setup complete. Service status:"
-sudo systemctl status $APP_NAME --no-pager
+if [ "$FIRST_TIME_SETUP" = true ]; then
+    echo "🎉 First-time setup completed!"
+    echo ""
+    echo "📋 Next steps:"
+    echo "   1. Ensure DNS points $DOMAIN to this server"
+    echo "   2. Wait 1-2 minutes for SSL certificate"
+    echo "   3. Test: curl https://$DOMAIN/health"
+    echo "   4. Update GitHub secret: NEXT_PUBLIC_API_URL=https://$DOMAIN"
+    echo "   5. Update backend .env: FRONTEND_URL=https://black-dune-04f31470f.3.azurestaticapps.net"
+else
+    echo "🔄 Deployment complete!"
+    echo "   Backend is running on https://$DOMAIN"
+fi
+echo ""

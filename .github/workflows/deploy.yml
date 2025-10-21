@@ -1,0 +1,49 @@
+name: Deploy to Azure VM
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy Backend
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Deploy to Azure VM
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          script: |
+            set -e
+            
+            echo "📂 Navigating to application directory..."
+            cd ~/verbalforge-backend
+            
+            echo "📥 Pulling latest changes..."
+            git pull origin main
+            
+            echo "🚀 Running deployment..."
+            bash setup.sh api.verbalforge.xyz ${{ secrets.LETS_ENCRYPT_EMAIL }}
+            
+            echo "✅ Deployment complete!"
+            
+      - name: Verify Deployment
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          script: |
+            echo "🔍 Checking service status..."
+            sudo systemctl status verbalforge-backend --no-pager -l | head -50
+            
+            echo ""
+            echo "📊 Recent logs:"
+            sudo journalctl -u verbalforge-backend -n 50 --no-pager
