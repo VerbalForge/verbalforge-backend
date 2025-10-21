@@ -74,19 +74,8 @@ $DOMAIN {
     request_body {
         max_size 10MB
     }
-
-    # Logging
-    log {
-        output file /var/log/caddy/verbalforge-backend.log
-        format json
-    }
 }
 EOF
-
-# Create log directory
-echo "📁 Creating log directory..."
-mkdir -p /var/log/caddy
-chown caddy:caddy /var/log/caddy
 
 # Test Caddy configuration
 echo "✅ Testing Caddy configuration..."
