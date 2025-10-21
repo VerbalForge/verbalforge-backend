@@ -35,9 +35,12 @@ apt install -y caddy
 # Create Caddyfile
 echo "⚙️  Creating Caddy configuration..."
 cat > /etc/caddy/Caddyfile <<EOF
+{
+    email $EMAIL
+}
+
 $DOMAIN {
     # Automatic HTTPS with Let's Encrypt
-    email $EMAIL
 
     # Reverse proxy to Go backend
     reverse_proxy localhost:$BACKEND_PORT {
