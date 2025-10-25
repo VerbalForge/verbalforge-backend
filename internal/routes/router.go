@@ -67,6 +67,7 @@ func SetupRouter(db *mongo.Database) *gin.Engine {
 
 	// Apply middleware
 	router.Use(middleware.CORSMiddleware())
+	router.Use(middleware.LogCORSRequest())
 	router.Use(middleware.LoggingMiddleware())
 
 	// Inject database into context for compatibility (if needed)
