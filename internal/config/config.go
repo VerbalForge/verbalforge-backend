@@ -32,7 +32,6 @@ func Load() *Config {
 		frontendURLs = []string{"http://localhost:3000"}
 	}
 
-
 	// Load primary Mongo URI (no legacy fallbacks)
 	mongoURI := os.Getenv("MONGO_URI")
 	if mongoURI == "" {
