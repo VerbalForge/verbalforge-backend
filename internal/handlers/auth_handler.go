@@ -100,6 +100,35 @@ func (h *AuthHandler) GetCurrentUser(c *gin.Context) {
 	utils.SuccessResponse(c, http.StatusOK, user)
 }
 
+// RefreshToken generates a new JWT token for the authenticated user
+// @Summary Refresh authentication token
+// @Tags auth
+// @Produce json
+// @Success 200 {object} utils.APIResponse
+// @Router /auth/refresh [post]
+// @Security BearerAuth
+func (h *AuthHandler) RefreshToken(c *gin.Context) {
+	userID, ok := middleware.GetUserID(c)
+	if !ok {
+		utils.UnauthorizedResponse(c, "User not authenticated")
+		return
+	}
+
+	email, _ := middleware.GetEmail(c)
+	username, _ := middleware.GetUsername(c)
+
+	// Generate new token
+	newToken, err := h.authService.RefreshToken(userID, email, username)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to refresh token")
+		return
+	}
+
+	utils.SuccessResponse(c, http.StatusOK, gin.H{
+		"token": newToken,
+	})
+}
+
 // ChangePassword handles password change
 // @Summary Change password
 // @Tags auth

@@ -25,6 +25,7 @@ type User struct {
 	Phone         string          `json:"phone" bson:"phone"`
 	Bio           string          `json:"bio" bson:"bio"`
 	Password      string          `json:"-" bson:"password"`
+	IsAdmin       bool            `json:"isAdmin" bson:"is_admin"`
 	Preferences   UserPreferences `json:"preferences" bson:"preferences"`
 	TotalXP       int             `json:"totalXP" bson:"total_xp"`
 	TotalSolved   int             `json:"totalSolved" bson:"total_solved"`

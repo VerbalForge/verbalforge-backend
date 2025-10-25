@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 
@@ -10,9 +9,7 @@ import (
 	"verbalforge-backend/internal/models"
 	"verbalforge-backend/internal/services"
 	"verbalforge-backend/internal/utils"
-)
-
-// QuestionHandler handles question HTTP requests
+) // QuestionHandler handles question HTTP requests
 type QuestionHandler struct {
 	questionService *services.QuestionService
 }
@@ -22,27 +19,6 @@ func NewQuestionHandler(questionService *services.QuestionService) *QuestionHand
 	return &QuestionHandler{
 		questionService: questionService,
 	}
-}
-
-// GetQuestions retrieves questions with filters
-func (h *QuestionHandler) GetQuestions(c *gin.Context) {
-	questionType := c.Query("type")
-	difficulty := c.Query("difficulty")
-	cursor := c.Query("cursor")
-
-	limit := int64(50)
-	if limitParam := c.Query("limit"); limitParam != "" {
-		if parsedLimit, err := strconv.ParseInt(limitParam, 10, 64); err == nil {
-			limit = parsedLimit
-		}
-	}
-
-	response, err := h.questionService.GetPartialQuestionsWithCursor(questionType, difficulty, limit, cursor)
-	if err != nil {
-		utils.InternalServerErrorResponse(c, err.Error())
-		return
-	}
-	utils.SuccessResponse(c, http.StatusOK, response)
 }
 
 // GetQuestionByID retrieves a question by ID

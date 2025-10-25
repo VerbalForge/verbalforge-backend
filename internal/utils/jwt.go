@@ -6,6 +6,12 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+// Token expiration constants
+const (
+	TokenExpiration       = 1 * time.Hour
+	TokenRefreshThreshold = 10 * time.Minute
+)
+
 // Claims represents JWT claims structure
 type Claims struct {
 	UserID   string `json:"user_id"`
@@ -21,7 +27,7 @@ func GenerateJWT(userID, email, username, jwtSecret string) (string, error) {
 		Email:    email,
 		Username: username,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(7 * 24 * time.Hour)),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(TokenExpiration)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
 	}
@@ -45,4 +51,13 @@ func ValidateJWT(tokenString, jwtSecret string) (*Claims, error) {
 	}
 
 	return nil, jwt.ErrSignatureInvalid
+}
+
+// ShouldRefreshToken checks if a token should be refreshed (expires in < 10 minutes)
+func ShouldRefreshToken(claims *Claims) bool {
+	if claims.ExpiresAt == nil {
+		return false
+	}
+	timeUntilExpiry := time.Until(claims.ExpiresAt.Time)
+	return timeUntilExpiry < TokenRefreshThreshold && timeUntilExpiry > 0
 }

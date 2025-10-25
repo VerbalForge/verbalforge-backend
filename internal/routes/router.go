@@ -26,6 +26,9 @@ func SetupRouter(db *mongo.Database) *gin.Engine {
 	userActivitySummaryRepo := repository.NewUserActivitySummaryRepository(db)
 	wordRepo := repository.NewWordRepository(db)
 	userWordRepo := repository.NewUserWordRepository(db)
+	faqRepo := repository.NewFAQRepository(db)
+	supportRepo := repository.NewSupportTicketRepository(db)
+	feedbackRepo := repository.NewFeedbackRepository(db)
 
 	// Initialize services
 	authService := services.NewAuthService(userRepo, cfg.JWTSecret)
@@ -38,6 +41,11 @@ func SetupRouter(db *mongo.Database) *gin.Engine {
 	fileService := services.NewFileService(cfg.UploadDir)
 	wordService := services.NewWordService(wordRepo)
 	userWordService := services.NewUserWordService(userWordRepo)
+	faqService := services.NewFAQService(faqRepo)
+	supportService := services.NewSupportTicketService(supportRepo)
+	feedbackService := services.NewFeedbackService(feedbackRepo)
+	cacheService := services.NewCacheService()
+	practiceService := services.NewPracticeService(questionRepo, passageRepo, cacheService)
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(authService)
@@ -46,6 +54,10 @@ func SetupRouter(db *mongo.Database) *gin.Engine {
 	passageHandler := handlers.NewPassageHandler(passageService)
 	discussionHandler := handlers.NewDiscussionHandler(discussionService)
 	fileHandler := handlers.NewFileHandler(fileService)
+	faqHandler := handlers.NewFAQHandler(faqService)
+	supportHandler := handlers.NewSupportTicketHandler(supportService)
+	feedbackHandler := handlers.NewFeedbackHandler(feedbackService)
+	practiceHandler := handlers.NewPracticeHandler(practiceService)
 
 	// Initialize controllers
 	wordController := controllers.NewWordController(wordService, userWordService)
@@ -74,6 +86,7 @@ func SetupRouter(db *mongo.Database) *gin.Engine {
 		auth.POST("/register", authHandler.Register)
 		auth.POST("/login", authHandler.Login)
 		auth.GET("/me", middleware.AuthMiddleware(cfg.JWTSecret), authHandler.GetCurrentUser)
+		auth.POST("/refresh", middleware.AuthMiddleware(cfg.JWTSecret), authHandler.RefreshToken)
 		auth.POST("/change-password", middleware.AuthMiddleware(cfg.JWTSecret), authHandler.ChangePassword)
 		auth.DELETE("/delete-account", middleware.AuthMiddleware(cfg.JWTSecret), authHandler.DeleteAccount)
 	}
@@ -116,11 +129,18 @@ func SetupRouter(db *mongo.Database) *gin.Engine {
 		leaderboard.POST("/ranks/update", userHandler.UpdateRanks)
 	}
 
+	// Practice routes (unified endpoint for questions + passages)
+	practice := router.Group("/practice")
+	practice.Use(middleware.AuthMiddleware(cfg.JWTSecret))
+	{
+		practice.GET("", practiceHandler.GetPracticeItems)
+		practice.POST("/invalidate", practiceHandler.InvalidatePracticeCache)
+	}
+
 	// Question routes
 	questions := router.Group("/questions")
 	questions.Use(middleware.AuthMiddleware(cfg.JWTSecret))
 	{
-		questions.GET("", questionHandler.GetQuestions)
 		questions.GET("/:id", questionHandler.GetQuestionByID)
 	}
 
@@ -128,7 +148,6 @@ func SetupRouter(db *mongo.Database) *gin.Engine {
 	passages := router.Group("/passages")
 	passages.Use(middleware.AuthMiddleware(cfg.JWTSecret))
 	{
-		passages.GET("", passageHandler.GetPassages)
 		passages.GET("/:id", passageHandler.GetPassageByID)
 	}
 
@@ -173,6 +192,40 @@ func SetupRouter(db *mongo.Database) *gin.Engine {
 
 	// Serve uploaded files statically
 	router.Static("/uploads", cfg.UploadDir)
+
+	// FAQ routes (Public POST, Admin GET)
+	router.POST("/faq", faqHandler.CreateFAQ)
+
+	// Support routes (Authenticated POST, Admin GET)
+	support := router.Group("/support")
+	{
+		support.POST("", middleware.AuthMiddleware(cfg.JWTSecret), supportHandler.CreateSupportTicket)
+		support.GET("/my-tickets", middleware.AuthMiddleware(cfg.JWTSecret), supportHandler.GetUserSupportTickets)
+	}
+
+	// Feedback routes (Public POST, Admin GET)
+	router.POST("/feedback", feedbackHandler.CreateFeedback)
+
+	// Admin routes
+	admin := router.Group("/admin")
+	admin.Use(middleware.AuthMiddleware(cfg.JWTSecret))
+	admin.Use(middleware.AdminMiddleware(userRepo))
+	{
+		// FAQ admin routes
+		admin.GET("/faq", faqHandler.GetAllFAQs)
+		admin.PATCH("/faq/:id/status", faqHandler.UpdateFAQStatus)
+		admin.DELETE("/faq/:id", faqHandler.DeleteFAQ)
+
+		// Support admin routes
+		admin.GET("/support", supportHandler.GetAllSupportTickets)
+		admin.PATCH("/support/:id", supportHandler.UpdateSupportTicket)
+		admin.DELETE("/support/:id", supportHandler.DeleteSupportTicket)
+
+		// Feedback admin routes
+		admin.GET("/feedback", feedbackHandler.GetAllFeedback)
+		admin.PATCH("/feedback/:id/status", feedbackHandler.UpdateFeedbackStatus)
+		admin.DELETE("/feedback/:id", feedbackHandler.DeleteFeedback)
+	}
 
 	return router
 }

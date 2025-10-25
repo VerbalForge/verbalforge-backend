@@ -9,7 +9,6 @@ import (
 
 	"verbalforge-backend/internal/models"
 	"verbalforge-backend/internal/repository"
-	"verbalforge-backend/internal/utils"
 )
 
 // PassageService handles passage business logic
@@ -47,84 +46,6 @@ func (s *PassageService) GetPassages(difficulty string, limit, skip int64) ([]mo
 	}
 
 	return s.passageRepo.FindAll(filter, limit, skip)
-}
-
-// GetPartialPassages retrieves partial passages with filters
-// GetPartialPassagesWithCursor retrieves passages with cursor-based pagination
-func (s *PassageService) GetPartialPassagesWithCursor(difficulty string, limit int64, cursor string) (*models.PassagesResponse, error) {
-	filter := bson.M{}
-
-	if difficulty != "" {
-		filter["difficulty"] = difficulty
-	}
-
-	// Decode cursor
-	var lastID, lastCreatedAt string
-	if cursor != "" {
-		cursorData, err := utils.DecodeCursor(cursor)
-		if err != nil {
-			return nil, fmt.Errorf("invalid cursor: %w", err)
-		}
-		if cursorData != nil {
-			lastID = cursorData.LastID
-			lastCreatedAt = cursorData.LastCreatedAt
-		}
-	}
-
-	// Fetch passages with cursor
-	passages, err := s.passageRepo.FindPartialWithCursor(filter, limit, lastID, lastCreatedAt)
-	if err != nil {
-		return nil, err
-	}
-
-	// Determine if there are more results
-	hasMore := int64(len(passages)) > limit
-	if hasMore {
-		passages = passages[:limit] // Remove the extra item
-	}
-
-	// Create next cursor if there are more results
-	var nextCursor string
-	if hasMore && len(passages) > 0 {
-		lastPassage := passages[len(passages)-1]
-		cursorData := utils.CursorData{
-			LastID:        lastPassage.ID,
-			LastCreatedAt: lastPassage.CreatedAt,
-		}
-		nextCursor, err = utils.EncodeCursor(cursorData)
-		if err != nil {
-			return nil, fmt.Errorf("failed to encode cursor: %w", err)
-		}
-	}
-
-	// Create previous cursor if we have a current cursor (not on first page)
-	var previousCursor string
-	if cursor != "" && len(passages) > 0 {
-		firstPassage := passages[0]
-		cursorData := utils.CursorData{
-			LastID:        firstPassage.ID,
-			LastCreatedAt: firstPassage.CreatedAt,
-		}
-		previousCursor, err = utils.EncodeCursor(cursorData)
-		if err != nil {
-			return nil, fmt.Errorf("failed to encode previous cursor: %w", err)
-		}
-	}
-
-	// Get total count
-	total, err := s.passageRepo.Count(filter)
-	if err != nil {
-		return nil, err
-	}
-
-	return &models.PassagesResponse{
-		Passages:       passages,
-		Total:          total,
-		Limit:          int(limit),
-		NextCursor:     nextCursor,
-		PreviousCursor: previousCursor,
-		HasMore:        hasMore,
-	}, nil
 }
 
 // GetPassageByID retrieves a passage by ID

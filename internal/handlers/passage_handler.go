@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 
@@ -10,9 +9,7 @@ import (
 	"verbalforge-backend/internal/models"
 	"verbalforge-backend/internal/services"
 	"verbalforge-backend/internal/utils"
-)
-
-// PassageHandler handles passage HTTP requests
+) // PassageHandler handles passage HTTP requests
 type PassageHandler struct {
 	passageService *services.PassageService
 }
@@ -22,26 +19,6 @@ func NewPassageHandler(passageService *services.PassageService) *PassageHandler 
 	return &PassageHandler{
 		passageService: passageService,
 	}
-}
-
-// GetPassages retrieves passages with filters
-func (h *PassageHandler) GetPassages(c *gin.Context) {
-	difficulty := c.Query("difficulty")
-	cursor := c.Query("cursor")
-
-	limit := int64(50)
-	if limitParam := c.Query("limit"); limitParam != "" {
-		if parsedLimit, err := strconv.ParseInt(limitParam, 10, 64); err == nil {
-			limit = parsedLimit
-		}
-	}
-
-	response, err := h.passageService.GetPartialPassagesWithCursor(difficulty, limit, cursor)
-	if err != nil {
-		utils.InternalServerErrorResponse(c, err.Error())
-		return
-	}
-	utils.SuccessResponse(c, http.StatusOK, response)
 }
 
 // GetPassageByID retrieves a passage by ID

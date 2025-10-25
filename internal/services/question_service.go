@@ -3,14 +3,12 @@ package services
 import (
 	"errors"
 	"fmt"
-	"strings"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 
 	"verbalforge-backend/internal/models"
 	"verbalforge-backend/internal/repository"
-	"verbalforge-backend/internal/utils"
 )
 
 // QuestionService handles question business logic
@@ -51,95 +49,6 @@ func (s *QuestionService) GetQuestions(questionType, difficulty string, limit, s
 	}
 
 	return s.questionRepo.FindAll(filter, limit, skip)
-}
-
-// GetPartialQuestions retrieves partial questions with filters
-// GetPartialQuestionsWithCursor retrieves questions with cursor-based pagination
-func (s *QuestionService) GetPartialQuestionsWithCursor(questionType, difficulty string, limit int64, cursor string) (*models.QuestionsResponse, error) {
-	filter := bson.M{}
-
-	if questionType != "" {
-		// Support multiple types separated by comma
-		types := strings.Split(questionType, ",")
-		if len(types) > 1 {
-			// Multiple types - use $in operator
-			filter["question_type"] = bson.M{"$in": types}
-		} else {
-			// Single type - exact match
-			filter["question_type"] = questionType
-		}
-	}
-	if difficulty != "" {
-		filter["difficulty_level"] = difficulty
-	}
-
-	// Decode cursor
-	var lastID, lastCreatedAt string
-	if cursor != "" {
-		cursorData, err := utils.DecodeCursor(cursor)
-		if err != nil {
-			return nil, fmt.Errorf("invalid cursor: %w", err)
-		}
-		if cursorData != nil {
-			lastID = cursorData.LastID
-			lastCreatedAt = cursorData.LastCreatedAt
-		}
-	}
-
-	// Fetch questions with cursor
-	questions, err := s.questionRepo.FindPartialWithCursor(filter, limit, lastID, lastCreatedAt)
-	if err != nil {
-		return nil, err
-	}
-
-	// Determine if there are more results
-	hasMore := int64(len(questions)) > limit
-	if hasMore {
-		questions = questions[:limit] // Remove the extra item
-	}
-
-	// Create next cursor if there are more results
-	var nextCursor string
-	if hasMore && len(questions) > 0 {
-		lastQuestion := questions[len(questions)-1]
-		cursorData := utils.CursorData{
-			LastID:        lastQuestion.ID,
-			LastCreatedAt: lastQuestion.CreatedAt,
-		}
-		nextCursor, err = utils.EncodeCursor(cursorData)
-		if err != nil {
-			return nil, fmt.Errorf("failed to encode cursor: %w", err)
-		}
-	}
-
-	// Create previous cursor if we have a current cursor (not on first page)
-	var previousCursor string
-	if cursor != "" && len(questions) > 0 {
-		firstQuestion := questions[0]
-		cursorData := utils.CursorData{
-			LastID:        firstQuestion.ID,
-			LastCreatedAt: firstQuestion.CreatedAt,
-		}
-		previousCursor, err = utils.EncodeCursor(cursorData)
-		if err != nil {
-			return nil, fmt.Errorf("failed to encode previous cursor: %w", err)
-		}
-	}
-
-	// Get total count
-	total, err := s.questionRepo.Count(filter)
-	if err != nil {
-		return nil, err
-	}
-
-	return &models.QuestionsResponse{
-		Questions:      questions,
-		Total:          total,
-		Limit:          int(limit),
-		NextCursor:     nextCursor,
-		PreviousCursor: previousCursor,
-		HasMore:        hasMore,
-	}, nil
 }
 
 // GetQuestionByID retrieves a question by ID

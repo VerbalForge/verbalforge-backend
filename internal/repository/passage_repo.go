@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"log"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -27,11 +28,16 @@ func (r *PassageRepository) FindByID(id string) (*models.Passage, error) {
 	ctx := context.Background()
 	var passage models.Passage
 
-	err := r.collection.FindOne(ctx, bson.M{"_id": id}).Decode(&passage)
+	filter := bson.M{"_id": id}
+	log.Printf("DEBUG: Looking for passage with filter: %+v", filter)
+
+	err := r.collection.FindOne(ctx, filter).Decode(&passage)
 	if err != nil {
+		log.Printf("DEBUG: FindByID error for id '%s': %v", id, err)
 		return nil, err
 	}
 
+	log.Printf("DEBUG: Found passage: %s", passage.ID)
 	return &passage, nil
 }
 
@@ -107,64 +113,4 @@ func (r *PassageRepository) Count(filter bson.M) (int64, error) {
 		return 0, err
 	}
 	return count, nil
-}
-
-// FindPartialWithCursor returns partial passages using cursor-based pagination
-func (r *PassageRepository) FindPartialWithCursor(filter bson.M, limit int64, lastID, lastCreatedAt string) ([]models.PartialPassage, error) {
-	ctx := context.Background()
-
-	// Build cursor filter
-	cursorFilter := bson.M{}
-	for k, v := range filter {
-		cursorFilter[k] = v
-	}
-
-	// Add cursor conditions for pagination
-	if lastID != "" && lastCreatedAt != "" {
-		cursorFilter["$or"] = []bson.M{
-			{"metadata.created_at": bson.M{"$lt": lastCreatedAt}},
-			{
-				"metadata.created_at": lastCreatedAt,
-				"_id":                 bson.M{"$gt": lastID},
-			},
-		}
-	}
-
-	// Use aggregation pipeline to flatten metadata.created_at
-	pipeline := []bson.M{
-		{"$match": cursorFilter},
-		{"$sort": bson.D{
-			{Key: "metadata.created_at", Value: -1},
-			{Key: "_id", Value: 1},
-		}},
-	}
-
-	if limit > 0 {
-		pipeline = append(pipeline, bson.M{"$limit": limit + 1})
-	}
-
-	// Project and flatten the created_at field
-	pipeline = append(pipeline, bson.M{
-		"$project": bson.M{
-			"_id":          "$_id",
-			"passage":      1,
-			"title":        1,
-			"difficulty":   1,
-			"question_ids": 1,
-			"created_at":   "$metadata.created_at",
-		},
-	})
-
-	cursor, err := r.collection.Aggregate(ctx, pipeline)
-	if err != nil {
-		return nil, err
-	}
-	defer cursor.Close(ctx)
-
-	var passages []models.PartialPassage
-	if err = cursor.All(ctx, &passages); err != nil {
-		return nil, err
-	}
-
-	return passages, nil
 }

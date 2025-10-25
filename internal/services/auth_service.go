@@ -89,6 +89,15 @@ func (s *AuthService) GetCurrentUser(userID string) (*models.User, error) {
 	return user, nil
 }
 
+// RefreshToken generates a new JWT token for an authenticated user
+func (s *AuthService) RefreshToken(userID, email, username string) (string, error) {
+	token, err := utils.GenerateJWT(userID, email, username, s.jwtSecret)
+	if err != nil {
+		return "", errors.New("failed to generate token")
+	}
+	return token, nil
+}
+
 // ChangePassword changes a user's password
 func (s *AuthService) ChangePassword(userID string, req *models.ChangePasswordRequest) error {
 	// Get user

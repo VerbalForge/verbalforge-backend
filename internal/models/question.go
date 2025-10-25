@@ -37,7 +37,9 @@ type PartialQuestion struct {
 	DifficultyLevel string `json:"difficulty_level" bson:"difficulty_level"`
 	Topic           string `json:"topic" bson:"topic"`
 	QuestionText    string `json:"question_text" bson:"question_text"`
-	CreatedAt       string `json:"created_at" bson:"created_at"`
+	Metadata        struct {
+		CreatedAt string `json:"created_at" bson:"created_at"`
+	} `json:"metadata" bson:"metadata"`
 }
 
 // QuestionsResponse represents paginated questions response with cursor-based pagination

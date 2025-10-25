@@ -11,6 +11,7 @@ import (
 )
 
 // AuthMiddleware validates JWT tokens and sets user context
+// It also handles automatic token refresh when the token is close to expiry
 func AuthMiddleware(jwtSecret string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
@@ -41,6 +42,21 @@ func AuthMiddleware(jwtSecret string) gin.HandlerFunc {
 		c.Set("userID", claims.UserID)
 		c.Set("email", claims.Email)
 		c.Set("username", claims.Username)
+
+		// Check if token needs refresh
+		// Exclude /auth/me endpoint from automatic refresh
+		path := c.Request.URL.Path
+		if !strings.HasSuffix(path, "/auth/me") && utils.ShouldRefreshToken(claims) {
+			// Generate new token
+			newToken, err := utils.GenerateJWT(claims.UserID, claims.Email, claims.Username, jwtSecret)
+			if err != nil {
+				logger.Errorf("Token refresh error: %v", err)
+			} else {
+				// Send new token in response header
+				c.Header("X-New-Token", newToken)
+				logger.Infof("Token refreshed for user: %s", claims.Username)
+			}
+		}
 
 		c.Next()
 	}
