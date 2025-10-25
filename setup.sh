@@ -80,7 +80,15 @@ echo "🔨 Building application..."
 # Ensure we're in the app directory
 cd $APP_DIR
 
-# Build the application
+# Optional cache cleanup (skip by exporting SKIP_CACHE_CLEAN=true)
+if [ "$SKIP_CACHE_CLEAN" != "true" ]; then
+    echo "🧹 Cleaning Go build & module caches..."
+    /usr/local/go/bin/go clean -cache -modcache -testcache || echo "⚠️ Cache clean failed (non-critical)"
+    echo "🧹 Removing old binary (if present)..."
+    rm -f "$APP_DIR/$APP_NAME" || true
+fi
+
+# Build the application (fresh after cache cleanup)
 export PATH=$PATH:/usr/local/go/bin
 /usr/local/go/bin/go mod download
 /usr/local/go/bin/go build -o $APP_NAME ./cmd/server
