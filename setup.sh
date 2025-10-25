@@ -115,6 +115,7 @@ ExecStart=$APP_DIR/$APP_NAME
 Restart=always
 RestartSec=5
 Environment="PATH=/usr/local/go/bin:/usr/bin:/bin"
+EnvironmentFile=$APP_DIR/.env
 
 [Install]
 WantedBy=multi-user.target

@@ -32,8 +32,15 @@ func Load() *Config {
 		frontendURLs = []string{"http://localhost:3000"}
 	}
 
+
+	// Load primary Mongo URI (no legacy fallbacks)
+	mongoURI := os.Getenv("MONGO_URI")
+	if mongoURI == "" {
+		mongoURI = "mongodb://localhost:27017/verbalforge"
+	}
+
 	AppConfig = &Config{
-		MongoURI:     getEnv("MONGO_URI", "mongodb://localhost:27017/verbalforge"),
+		MongoURI:     mongoURI,
 		JWTSecret:    getEnv("JWT_SECRET", "your-super-secret-jwt-key-change-this-in-production"),
 		FrontendURLs: frontendURLs,
 		UploadDir:    getEnv("UPLOAD_DIR", "./uploads"),
