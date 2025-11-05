@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 
@@ -110,4 +111,146 @@ func (h *PassageHandler) SubmitPassageAttempt(c *gin.Context) {
 	}
 
 	utils.SuccessResponse(c, http.StatusOK, response)
+}
+
+// Admin-specific handlers
+
+// AdminGetAllPassages returns all passages with filters for admin
+func (h *PassageHandler) AdminGetAllPassages(c *gin.Context) {
+	published := c.Query("published") // "true", "false", or "" (all)
+	difficulty := c.Query("difficulty")
+	search := c.Query("search")
+	limitStr := c.DefaultQuery("limit", "0") // 0 = no limit for admin
+	skipStr := c.DefaultQuery("skip", "0")
+
+	limit, _ := strconv.ParseInt(limitStr, 10, 64)
+	skip, _ := strconv.ParseInt(skipStr, 10, 64)
+
+	passages, total, err := h.passageService.GetPassages(published, difficulty, search, limit, skip)
+	if err != nil {
+		utils.InternalServerErrorResponse(c, err.Error())
+		return
+	}
+
+	utils.SuccessResponse(c, http.StatusOK, gin.H{
+		"passages": passages,
+		"total":    total,
+	})
+}
+
+// AdminUpdatePassage updates a passage (full update)
+func (h *PassageHandler) AdminUpdatePassage(c *gin.Context) {
+	passageID := c.Param("id")
+
+	var updateData models.Passage
+	if err := c.ShouldBindJSON(&updateData); err != nil {
+		utils.BadRequestResponse(c, err.Error())
+		return
+	}
+
+	if err := h.passageService.UpdatePassage(passageID, &updateData); err != nil {
+		utils.InternalServerErrorResponse(c, err.Error())
+		return
+	}
+
+	utils.SuccessResponse(c, http.StatusOK, gin.H{"message": "Passage updated successfully"})
+}
+
+// AdminDeletePassage deletes a passage and handles cleanup
+func (h *PassageHandler) AdminDeletePassage(c *gin.Context) {
+	passageID := c.Param("id")
+
+	if err := h.passageService.DeletePassage(passageID); err != nil {
+		utils.InternalServerErrorResponse(c, err.Error())
+		return
+	}
+
+	utils.SuccessResponse(c, http.StatusOK, gin.H{"message": "Passage deleted successfully"})
+}
+
+// AdminPublishPassage toggles publish status
+func (h *PassageHandler) AdminPublishPassage(c *gin.Context) {
+	passageID := c.Param("id")
+
+	var req struct {
+		Publish bool `json:"publish"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.BadRequestResponse(c, err.Error())
+		return
+	}
+
+	publishedAt, err := h.passageService.PublishPassage(passageID, req.Publish)
+	if err != nil {
+		utils.InternalServerErrorResponse(c, err.Error())
+		return
+	}
+
+	status := "unpublished"
+	if req.Publish {
+		status = "published"
+	}
+
+	utils.SuccessResponse(c, http.StatusOK, gin.H{
+		"message":      "Passage " + status + " successfully",
+		"published_at": publishedAt,
+	})
+}
+
+// AdminBulkDeletePassages deletes multiple passages
+func (h *PassageHandler) AdminBulkDeletePassages(c *gin.Context) {
+	var req struct {
+		PassageIDs []string `json:"passage_ids" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.BadRequestResponse(c, err.Error())
+		return
+	}
+
+	if len(req.PassageIDs) == 0 {
+		utils.BadRequestResponse(c, "No passage IDs provided")
+		return
+	}
+
+	if err := h.passageService.BulkDeletePassages(req.PassageIDs); err != nil {
+		utils.InternalServerErrorResponse(c, err.Error())
+		return
+	}
+
+	utils.SuccessResponse(c, http.StatusOK, gin.H{
+		"message": "Passages deleted successfully",
+		"count":   len(req.PassageIDs),
+	})
+}
+
+// AdminBulkPublishPassages publishes or unpublishes multiple passages
+func (h *PassageHandler) AdminBulkPublishPassages(c *gin.Context) {
+	var req struct {
+		PassageIDs []string `json:"passage_ids" binding:"required"`
+		Publish    bool     `json:"publish"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.BadRequestResponse(c, err.Error())
+		return
+	}
+
+	if len(req.PassageIDs) == 0 {
+		utils.BadRequestResponse(c, "No passage IDs provided")
+		return
+	}
+
+	if err := h.passageService.BulkPublishPassages(req.PassageIDs, req.Publish); err != nil {
+		utils.InternalServerErrorResponse(c, err.Error())
+		return
+	}
+
+	status := "unpublished"
+	if req.Publish {
+		status = "published"
+	}
+
+	utils.SuccessResponse(c, http.StatusOK, gin.H{
+		"message": "Passages " + status + " successfully",
+		"count":   len(req.PassageIDs),
+	})
 }

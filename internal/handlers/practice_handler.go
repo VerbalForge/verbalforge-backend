@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"verbalforge-backend/internal/models"
 	"verbalforge-backend/internal/services"
 	"verbalforge-backend/internal/utils"
 )
@@ -46,8 +47,16 @@ func (h *PracticeHandler) GetPracticeItems(c *gin.Context) {
 	difficulty := c.DefaultQuery("difficulty", "all")
 	itemType := c.DefaultQuery("type", "all")
 
+	// Check if user is admin
+	isAdmin := false
+	if userInterface, exists := c.Get("user"); exists {
+		if user, ok := userInterface.(*models.User); ok {
+			isAdmin = user.IsAdmin
+		}
+	}
+
 	// Get practice items
-	response, err := h.practiceService.GetPracticeItems(page, limit, difficulty, itemType)
+	response, err := h.practiceService.GetPracticeItems(page, limit, difficulty, itemType, isAdmin)
 	if err != nil {
 		utils.InternalServerErrorResponse(c, err.Error())
 		return

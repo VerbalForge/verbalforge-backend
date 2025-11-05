@@ -16,6 +16,9 @@ const (
 	// Discussion activities
 	ActivityDiscussion ActivityType = "discussion" // Covers all discussion/comment activities
 
+	// Word activities
+	ActivityWord ActivityType = "word" // Covers word learning activities
+
 	// Other activities
 	ActivityProfileViewed ActivityType = "profile_viewed"
 	ActivityStreakUpdated ActivityType = "streak_updated"
@@ -36,6 +39,18 @@ const (
 	// Like actions
 	ActionDiscussionLiked DiscussionActionType = "discussion_liked"
 	ActionCommentLiked    DiscussionActionType = "comment_liked"
+)
+
+// WordActionType represents the specific action type for word activities
+type WordActionType string
+
+const (
+	// Word learning actions
+	ActionWordMarkedKnown      WordActionType = "marked_known"
+	ActionWordMarkedPractice   WordActionType = "marked_practice"
+	ActionWordUnmarkedKnown    WordActionType = "unmarked_known"
+	ActionWordUnmarkedPractice WordActionType = "unmarked_practice"
+	ActionWordViewed           WordActionType = "viewed"
 )
 
 // QuestionActivityMetadata represents metadata for question activity (attempted or solved)
@@ -59,6 +74,16 @@ type DiscussionActivityMetadata struct {
 	Tags            []string             `bson:"tags,omitempty" json:"tags,omitempty"`            // For created
 	ActionType      DiscussionActionType `bson:"action_type" json:"actionType"`                   // Type of discussion action
 	IsComment       bool                 `bson:"is_comment" json:"isComment"`                     // true for comment actions, false for discussion actions
+}
+
+// WordActivityMetadata represents metadata for word learning activities
+type WordActivityMetadata struct {
+	WordID        string         `bson:"word_id" json:"wordId"`
+	Word          string         `bson:"word" json:"word"`                                        // The actual word
+	Source        string         `bson:"source,omitempty" json:"source,omitempty"`                // e.g., "GregMat", "Magoosh"
+	ActionType    WordActionType `bson:"action_type" json:"actionType"`                           // Type of word action
+	KnownCount    int            `bson:"known_count,omitempty" json:"knownCount,omitempty"`       // Total known words after action
+	PracticeCount int            `bson:"practice_count,omitempty" json:"practiceCount,omitempty"` // Total practice words after action
 }
 
 // LikedMetadata represents metadata for liked activity (deprecated - use DiscussionActivityMetadata)
@@ -113,6 +138,15 @@ func (a *UserActivity) GetDiscussionActivityMetadata() (*DiscussionActivityMetad
 // GetLikedMetadata extracts liked metadata (deprecated)
 func (a *UserActivity) GetLikedMetadata() (*LikedMetadata, error) {
 	var meta LikedMetadata
+	if err := unmarshalMetadata(a.Metadata, &meta); err != nil {
+		return nil, err
+	}
+	return &meta, nil
+}
+
+// GetWordActivityMetadata extracts word activity metadata
+func (a *UserActivity) GetWordActivityMetadata() (*WordActivityMetadata, error) {
+	var meta WordActivityMetadata
 	if err := unmarshalMetadata(a.Metadata, &meta); err != nil {
 		return nil, err
 	}

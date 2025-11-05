@@ -37,6 +37,7 @@ func (s *PracticeService) GetPracticeItems(
 	limit int,
 	difficulty string,
 	itemType string,
+	isAdmin bool,
 ) (*models.PracticeResponse, error) {
 	if page < 1 {
 		page = 1
@@ -45,8 +46,11 @@ func (s *PracticeService) GetPracticeItems(
 		limit = 20
 	}
 
-	// Generate cache key
+	// Generate cache key (admins have separate cache)
 	cacheKey := s.cacheService.GenerateCacheKey(difficulty, itemType)
+	if isAdmin {
+		cacheKey = cacheKey + "_admin"
+	}
 
 	// Try to get from cache
 	cachedItems, found := s.cacheService.Get(cacheKey)
@@ -57,7 +61,7 @@ func (s *PracticeService) GetPracticeItems(
 	} else {
 		// Cache miss - fetch and merge data
 		var err error
-		allItems, err = s.fetchAndMergeItems(difficulty, itemType)
+		allItems, err = s.fetchAndMergeItems(difficulty, itemType, isAdmin)
 		if err != nil {
 			return nil, err
 		}
@@ -94,7 +98,7 @@ func (s *PracticeService) GetPracticeItems(
 }
 
 // fetchAndMergeItems fetches questions and passages in parallel and merges them
-func (s *PracticeService) fetchAndMergeItems(difficulty, itemType string) ([]models.PracticeItem, error) {
+func (s *PracticeService) fetchAndMergeItems(difficulty, itemType string, isAdmin bool) ([]models.PracticeItem, error) {
 	var questions []models.PartialQuestion
 	var passages []models.PartialPassage
 	var wg sync.WaitGroup
@@ -109,7 +113,7 @@ func (s *PracticeService) fetchAndMergeItems(difficulty, itemType string) ([]mod
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			questions, questionErr = s.fetchQuestions(difficulty, itemType)
+			questions, questionErr = s.fetchQuestions(difficulty, itemType, isAdmin)
 		}()
 	}
 
@@ -118,7 +122,7 @@ func (s *PracticeService) fetchAndMergeItems(difficulty, itemType string) ([]mod
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			passages, passageErr = s.fetchPassages(difficulty)
+			passages, passageErr = s.fetchPassages(difficulty, isAdmin)
 		}()
 	}
 
@@ -151,8 +155,13 @@ func (s *PracticeService) fetchAndMergeItems(difficulty, itemType string) ([]mod
 }
 
 // fetchQuestions retrieves questions based on filters
-func (s *PracticeService) fetchQuestions(difficulty, itemType string) ([]models.PartialQuestion, error) {
+func (s *PracticeService) fetchQuestions(difficulty, itemType string, isAdmin bool) ([]models.PartialQuestion, error) {
 	filter := bson.M{}
+
+	// Filter published content for non-admin users (only show questions with non-null published_at)
+	if !isAdmin {
+		filter["metadata.published_at"] = bson.M{"$ne": nil}
+	}
 
 	if difficulty != "" && difficulty != "all" {
 		filter["difficulty_level"] = difficulty
@@ -186,8 +195,13 @@ func (s *PracticeService) fetchQuestions(difficulty, itemType string) ([]models.
 }
 
 // fetchPassages retrieves passages based on filters
-func (s *PracticeService) fetchPassages(difficulty string) ([]models.PartialPassage, error) {
+func (s *PracticeService) fetchPassages(difficulty string, isAdmin bool) ([]models.PartialPassage, error) {
 	filter := bson.M{}
+
+	// Filter published content for non-admin users (only show passages with non-null published_at)
+	if !isAdmin {
+		filter["metadata.published_at"] = bson.M{"$ne": nil}
+	}
 
 	if difficulty != "" && difficulty != "all" {
 		filter["difficulty"] = difficulty

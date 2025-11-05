@@ -139,3 +139,8 @@ func (s *UserService) UpdateRanks() error {
 func (s *UserService) GetActivityCalendar(userID string, days int, timezone string) ([]models.ActivityCalendarResponse, error) {
 	return s.activityService.GetActivityCalendar(userID, days, timezone)
 }
+
+// GetTotalUserCount returns the total number of registered users
+func (s *UserService) GetTotalUserCount() (int64, error) {
+	return s.userRepo.CountAll()
+}

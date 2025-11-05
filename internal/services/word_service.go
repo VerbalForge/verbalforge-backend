@@ -67,3 +67,27 @@ func (s *WordService) SearchWords(ctx context.Context, query string, sources []s
 
 	return s.wordRepo.GetWords(ctx, filters, userWords)
 }
+
+// CreateWord creates a new word
+func (s *WordService) CreateWord(ctx context.Context, word *models.Word) error {
+	if word.Word == "" {
+		return fmt.Errorf("word text is required")
+	}
+	return s.wordRepo.CreateWord(ctx, word)
+}
+
+// UpdateWord updates an existing word
+func (s *WordService) UpdateWord(ctx context.Context, id string, word *models.Word) error {
+	if id == "" {
+		return fmt.Errorf("word ID is required")
+	}
+	return s.wordRepo.UpdateWord(ctx, id, word)
+}
+
+// DeleteWord deletes a word by ID
+func (s *WordService) DeleteWord(ctx context.Context, id string) error {
+	if id == "" {
+		return fmt.Errorf("word ID is required")
+	}
+	return s.wordRepo.DeleteWord(ctx, id)
+}

@@ -114,3 +114,22 @@ func (r *PassageRepository) Count(filter bson.M) (int64, error) {
 	}
 	return count, nil
 }
+
+// Update updates a passage
+func (r *PassageRepository) Update(id string, passage *models.Passage) error {
+	ctx := context.Background()
+	filter := bson.M{"_id": id}
+	update := bson.M{"$set": passage}
+
+	_, err := r.collection.UpdateOne(ctx, filter, update)
+	return err
+}
+
+// Delete deletes a passage by ID
+func (r *PassageRepository) Delete(id string) error {
+	ctx := context.Background()
+	filter := bson.M{"_id": id}
+
+	_, err := r.collection.DeleteOne(ctx, filter)
+	return err
+}

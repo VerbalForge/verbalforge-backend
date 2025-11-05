@@ -116,3 +116,58 @@ func (r *UserActivityRepository) GetActivitiesByDateRange(userID string, startDa
 
 	return activities, nil
 }
+
+// FindAll returns activities with filters and pagination
+func (r *UserActivityRepository) FindAll(filter bson.M, limit int64, skip int64) ([]models.UserActivity, error) {
+	ctx := context.Background()
+
+	opts := options.Find()
+	if limit > 0 {
+		opts.SetLimit(limit)
+	}
+	if skip > 0 {
+		opts.SetSkip(skip)
+	}
+	opts.SetSort(bson.D{{Key: "timestamp", Value: -1}})
+
+	cursor, err := r.activityCollection.Find(ctx, filter, opts)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var activities []models.UserActivity
+	if err = cursor.All(ctx, &activities); err != nil {
+		return nil, err
+	}
+
+	return activities, nil
+}
+
+// Count returns the total count of activities matching the filter
+func (r *UserActivityRepository) Count(filter bson.M) (int64, error) {
+	ctx := context.Background()
+	count, err := r.activityCollection.CountDocuments(ctx, filter)
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+// Aggregate performs aggregation pipeline on activities
+func (r *UserActivityRepository) Aggregate(pipeline []bson.M) (*mongo.Cursor, error) {
+	ctx := context.Background()
+
+	// Convert []bson.M to []interface{} for the pipeline
+	interfacePipeline := make([]interface{}, len(pipeline))
+	for i, stage := range pipeline {
+		interfacePipeline[i] = stage
+	}
+
+	cursor, err := r.activityCollection.Aggregate(ctx, interfacePipeline)
+	if err != nil {
+		return nil, err
+	}
+
+	return cursor, nil
+}

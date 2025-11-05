@@ -1,6 +1,8 @@
 package utils
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -8,7 +10,7 @@ import (
 
 // Token expiration constants
 const (
-	TokenExpiration       = 1 * time.Hour
+	TokenExpiration       = 2 * time.Hour
 	TokenRefreshThreshold = 10 * time.Minute
 )
 
@@ -60,4 +62,13 @@ func ShouldRefreshToken(claims *Claims) bool {
 	}
 	timeUntilExpiry := time.Until(claims.ExpiresAt.Time)
 	return timeUntilExpiry < TokenRefreshThreshold && timeUntilExpiry > 0
+}
+
+// GenerateSecureToken generates a cryptographically secure random token
+func GenerateSecureToken(length int) (string, error) {
+	bytes := make([]byte, length)
+	if _, err := rand.Read(bytes); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(bytes), nil
 }

@@ -283,3 +283,81 @@ func (h *UserHandler) GetActivityCalendar(c *gin.Context) {
 
 	utils.SuccessResponse(c, http.StatusOK, activity)
 }
+
+// GetWordStatistics retrieves word learning statistics
+func (h *UserHandler) GetWordStatistics(c *gin.Context) {
+	username := c.Param("username")
+
+	profile, err := h.userService.GetProfileByUsername(username)
+	if err != nil {
+		utils.NotFoundResponse(c, err.Error())
+		return
+	}
+
+	days := 30 // Default to last 30 days
+	if daysParam := c.Query("days"); daysParam != "" {
+		if parsedDays, err := strconv.Atoi(daysParam); err == nil {
+			days = parsedDays
+		}
+	}
+
+	stats, err := h.activityService.GetWordStatistics(profile.User.ID, days)
+	if err != nil {
+		utils.InternalServerErrorResponse(c, err.Error())
+		return
+	}
+
+	utils.SuccessResponse(c, http.StatusOK, stats)
+}
+
+// Admin-specific handlers
+
+// AdminGetUserActivity returns detailed activity logs for a specific user
+func (h *UserHandler) AdminGetUserActivity(c *gin.Context) {
+	userID := c.Param("userId")
+	questionType := c.Query("type")
+	startDate := c.Query("start_date")
+	endDate := c.Query("end_date")
+	limitStr := c.DefaultQuery("limit", "100")
+	skipStr := c.DefaultQuery("skip", "0")
+
+	limit, _ := strconv.ParseInt(limitStr, 10, 64)
+	skip, _ := strconv.ParseInt(skipStr, 10, 64)
+
+	activities, total, err := h.activityService.GetUserActivityLogs(userID, questionType, startDate, endDate, limit, skip)
+	if err != nil {
+		utils.InternalServerErrorResponse(c, err.Error())
+		return
+	}
+
+	utils.SuccessResponse(c, http.StatusOK, gin.H{
+		"activities": activities,
+		"total":      total,
+		"limit":      limit,
+		"skip":       skip,
+	})
+}
+
+// AdminGetUserStats returns aggregated stats for a specific user
+func (h *UserHandler) AdminGetUserStats(c *gin.Context) {
+	userID := c.Param("userId")
+
+	stats, err := h.activityService.GetUserAggregatedStats(userID)
+	if err != nil {
+		utils.InternalServerErrorResponse(c, err.Error())
+		return
+	}
+
+	utils.SuccessResponse(c, http.StatusOK, stats)
+}
+
+// AdminGetTotalUsers returns the total number of registered users
+func (h *UserHandler) AdminGetTotalUsers(c *gin.Context) {
+	count, err := h.userService.GetTotalUserCount()
+	if err != nil {
+		utils.InternalServerErrorResponse(c, err.Error())
+		return
+	}
+
+	utils.SuccessResponse(c, http.StatusOK, gin.H{"total": count})
+}

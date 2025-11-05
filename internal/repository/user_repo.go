@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -119,6 +120,58 @@ func (r *UserRepository) FindByID(id string) (*models.User, error) {
 	return user, nil
 }
 
+// FindByOAuthID finds a user by OAuth provider and OAuth ID
+func (r *UserRepository) FindByOAuthID(provider, oauthID string) (*models.User, error) {
+	user := &models.User{}
+	err := r.collection.FindOne(context.Background(), bson.M{
+		"oauth_provider": provider,
+		"oauth_id":       oauthID,
+	}).Decode(user)
+	if err != nil {
+		return nil, err
+	}
+	return user, nil
+}
+
+// CreateOAuthUser creates a new user from OAuth login (no password required)
+func (r *UserRepository) CreateOAuthUser(user *models.User) (*models.User, error) {
+	// Check if email already exists
+	existingUser, err := r.FindByEmail(user.Email)
+	if err == nil && existingUser != nil {
+		return nil, fmt.Errorf("email already exists")
+	}
+
+	// Check if username already exists
+	existingUser, err = r.FindByUsername(user.Username)
+	if err == nil && existingUser != nil {
+		return nil, fmt.Errorf("username already exists")
+	}
+
+	// Generate UUID for the user
+	user.ID = uuid.New().String()
+	user.CreatedAt = time.Now()
+	user.UpdatedAt = time.Now()
+
+	// Set default values for stats if not set
+	if user.TotalXP == 0 {
+		user.TotalXP = 0
+	}
+	if user.TotalSolved == 0 {
+		user.TotalSolved = 0
+	}
+	if user.TotalAttempts == 0 {
+		user.TotalAttempts = 0
+	}
+
+	// Insert the user
+	_, err = r.collection.InsertOne(context.Background(), user)
+	if err != nil {
+		return nil, err
+	}
+
+	return user, nil
+}
+
 // Update updates a user
 func (r *UserRepository) Update(id string, updates bson.M) error {
 	updates["updatedAt"] = time.Now()
@@ -145,6 +198,43 @@ func (r *UserRepository) HashPassword(password string) (string, error) {
 		return "", err
 	}
 	return string(hashedPassword), nil
+}
+
+// SetResetToken sets the password reset token and expiry for a user
+func (r *UserRepository) SetResetToken(userID, token string, expiry time.Time) error {
+	updates := bson.M{
+		"reset_token":        token,
+		"reset_token_expiry": expiry,
+		"updatedAt":          time.Now(),
+	}
+	_, err := r.collection.UpdateOne(context.Background(), bson.M{"_id": userID}, bson.M{"$set": updates})
+	return err
+}
+
+// FindByResetToken finds a user by reset token
+func (r *UserRepository) FindByResetToken(token string) (*models.User, error) {
+	user := &models.User{}
+	err := r.collection.FindOne(context.Background(), bson.M{
+		"reset_token": token,
+		"reset_token_expiry": bson.M{
+			"$gt": time.Now(), // Token must not be expired
+		},
+	}).Decode(user)
+	if err != nil {
+		return nil, err
+	}
+	return user, nil
+}
+
+// ClearResetToken clears the password reset token for a user
+func (r *UserRepository) ClearResetToken(userID string) error {
+	updates := bson.M{
+		"reset_token":        "",
+		"reset_token_expiry": time.Time{},
+		"updatedAt":          time.Now(),
+	}
+	_, err := r.collection.UpdateOne(context.Background(), bson.M{"_id": userID}, bson.M{"$set": updates})
+	return err
 }
 
 // IncrementXP increments user's total XP and total attempts
@@ -336,4 +426,10 @@ func (r *UserRepository) GetLeaderboard(limit int) ([]models.LeaderboardEntry, e
 	}
 
 	return leaderboard, nil
+}
+
+// CountAll returns the total number of users
+func (r *UserRepository) CountAll() (int64, error) {
+	ctx := context.Background()
+	return r.collection.CountDocuments(ctx, bson.M{})
 }

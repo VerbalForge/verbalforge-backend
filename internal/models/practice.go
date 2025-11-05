@@ -17,6 +17,7 @@ type PracticeItem struct {
 	Title      string           `json:"title"`
 	Difficulty string           `json:"difficulty"`
 	CreatedAt  time.Time        `json:"created_at"`
+	IsNew      bool             `json:"is_new"` // Published within last 24 hours
 
 	// Question-specific fields (nil if type is passage)
 	QuestionText *string `json:"question_text,omitempty"`
@@ -40,16 +41,19 @@ type PracticeResponse struct {
 
 // NewPracticeItemFromQuestion creates a PracticeItem from a PartialQuestion
 func NewPracticeItemFromQuestion(q PartialQuestion) PracticeItem {
-	createdAt, err := time.Parse(time.RFC3339, q.Metadata.CreatedAt)
-	if err != nil {
-		// If parsing fails, use zero time (will appear at end when sorted descending)
-		createdAt = time.Time{}
-	}
+	createdAt := q.Metadata.CreatedAt
 
 	// Create a title from question text (first 100 chars)
 	title := q.QuestionText
 	if len(title) > 100 {
 		title = title[:97] + "..."
+	}
+
+	// Check if published within last 24 hours
+	isNew := false
+	if q.Metadata.PublishedAt != nil {
+		publishedAt := *q.Metadata.PublishedAt
+		isNew = time.Since(publishedAt) < 24*time.Hour
 	}
 
 	return PracticeItem{
@@ -58,6 +62,7 @@ func NewPracticeItemFromQuestion(q PartialQuestion) PracticeItem {
 		Title:        title,
 		Difficulty:   q.DifficultyLevel,
 		CreatedAt:    createdAt,
+		IsNew:        isNew,
 		QuestionText: &q.QuestionText,
 		QuestionType: &q.QuestionType,
 		Topic:        &q.Topic,
@@ -66,11 +71,7 @@ func NewPracticeItemFromQuestion(q PartialQuestion) PracticeItem {
 
 // NewPracticeItemFromPassage creates a PracticeItem from a PartialPassage
 func NewPracticeItemFromPassage(p PartialPassage) PracticeItem {
-	createdAt, err := time.Parse(time.RFC3339, p.Metadata.CreatedAt)
-	if err != nil {
-		// If parsing fails, use zero time (will appear at end when sorted descending)
-		createdAt = time.Time{}
-	}
+	createdAt := p.Metadata.CreatedAt
 
 	// Create a preview of the passage (first 150 chars)
 	preview := p.Passage
@@ -87,12 +88,20 @@ func NewPracticeItemFromPassage(p PartialPassage) PracticeItem {
 		}
 	}
 
+	// Check if published within last 24 hours
+	isNew := false
+	if p.Metadata.PublishedAt != nil {
+		publishedAt := *p.Metadata.PublishedAt
+		isNew = time.Since(publishedAt) < 24*time.Hour
+	}
+
 	return PracticeItem{
 		ID:             p.ID,
 		Type:           PracticeItemTypePassage,
 		Title:          title,
 		Difficulty:     p.Difficulty,
 		CreatedAt:      createdAt,
+		IsNew:          isNew,
 		PassagePreview: &preview,
 		QuestionIDs:    p.QuestionIDs,
 	}

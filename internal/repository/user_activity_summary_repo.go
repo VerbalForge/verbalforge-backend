@@ -125,6 +125,126 @@ func (r *UserActivitySummaryRepository) UpsertDailyActivity(userID, date string,
 	return err
 }
 
+// UpsertWordActivity updates or adds word activity data to the daily activity entry
+func (r *UserActivitySummaryRepository) UpsertWordActivity(userID, date string, actionType models.WordActionType, wordID string) error {
+	ctx := context.Background()
+	now := time.Now()
+
+	// Parse the date string to get start of day timestamp
+	dayStart, err := time.Parse("2006-01-02", date)
+	if err != nil {
+		return err
+	}
+
+	filter := bson.M{
+		"user_id": userID,
+	}
+
+	// Check if activity for this date already exists
+	arrayFilter := bson.M{
+		"user_id": userID,
+		"daily_activities.timestamp": bson.M{
+			"$gte": dayStart,
+			"$lt":  dayStart.AddDate(0, 0, 1),
+		},
+	}
+
+	var existing models.UserActivitySummary
+	err = r.collection.FindOne(ctx, arrayFilter).Decode(&existing)
+
+	// Determine which field to increment based on action type
+	var fieldToIncrement string
+	switch actionType {
+	case models.ActionWordMarkedKnown:
+		fieldToIncrement = "words_marked_known"
+	case models.ActionWordMarkedPractice:
+		fieldToIncrement = "words_marked_practice"
+	case models.ActionWordViewed:
+		fieldToIncrement = "words_viewed"
+	default:
+		// For unmarked actions, don't increment counters
+		fieldToIncrement = ""
+	}
+
+	if err == mongo.ErrNoDocuments || len(existing.DailyActivities) == 0 {
+		// Date doesn't exist, push new daily activity
+		newActivity := bson.M{
+			"timestamp":             dayStart,
+			"questions_solved":      0,
+			"questions_attempted":   0,
+			"question_ids":          []string{},
+			"total_xp":              0,
+			"total_activities":      1,
+			"words_marked_known":    0,
+			"words_marked_practice": 0,
+			"words_viewed":          0,
+			"word_ids":              []string{},
+			"created_at":            now,
+			"updated_at":            now,
+		}
+
+		if fieldToIncrement != "" {
+			newActivity[fieldToIncrement] = 1
+		}
+		if wordID != "" {
+			newActivity["word_ids"] = []string{wordID}
+		}
+
+		update := bson.M{
+			"$push": bson.M{
+				"daily_activities": newActivity,
+			},
+			"$setOnInsert": bson.M{
+				"_id":        uuid.New().String(),
+				"user_id":    userID,
+				"created_at": now,
+			},
+			"$set": bson.M{
+				"updated_at": now,
+			},
+		}
+
+		opts := options.Update().SetUpsert(true)
+		_, err = r.collection.UpdateOne(ctx, filter, update, opts)
+		return err
+	}
+
+	// Date exists, update the existing daily activity
+	update := bson.M{
+		"$inc": bson.M{
+			"daily_activities.$[elem].total_activities": 1,
+		},
+		"$set": bson.M{
+			"updated_at":                          now,
+			"daily_activities.$[elem].updated_at": now,
+		},
+	}
+
+	if fieldToIncrement != "" {
+		update["$inc"].(bson.M)["daily_activities.$[elem]."+fieldToIncrement] = 1
+	}
+
+	if wordID != "" {
+		update["$addToSet"] = bson.M{
+			"daily_activities.$[elem].word_ids": wordID,
+		}
+	}
+
+	arrayFilters := options.Update().SetArrayFilters(options.ArrayFilters{
+		Filters: []interface{}{
+			bson.M{
+				"elem.timestamp": bson.M{
+					"$gte": dayStart,
+					"$lt":  dayStart.AddDate(0, 0, 1),
+				},
+			},
+		},
+	})
+
+	_, err = r.collection.UpdateOne(ctx, filter, update, arrayFilters)
+	return err
+}
+
 // GetUserSummary retrieves the activity summary for a user
 func (r *UserActivitySummaryRepository) GetUserSummary(userID string) (*models.UserActivitySummary, error) {
 	ctx := context.Background()

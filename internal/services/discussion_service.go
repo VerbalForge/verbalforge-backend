@@ -575,3 +575,24 @@ func (s *DiscussionService) GetUserDiscussionsWithCursor(username string, limit 
 		HasMore:     hasMore,
 	}, nil
 }
+
+// GetAllDiscussions returns all discussions with pagination (for moderation/admin)
+func (s *DiscussionService) GetAllDiscussions(limit, skip int64) ([]models.Discussion, int64, error) {
+	// Convert skip to page number (1-based)
+	page := 1
+	if skip > 0 && limit > 0 {
+		page = int(skip/limit) + 1
+	}
+
+	discussions, total, err := s.discussionRepo.FindAll(page, int(limit), "", []string{})
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return discussions, total, nil
+}
+
+// DeleteDiscussionByID deletes a discussion by ID (for moderation/admin)
+func (s *DiscussionService) DeleteDiscussionByID(discussionID string) error {
+	return s.discussionRepo.Delete(discussionID)
+}

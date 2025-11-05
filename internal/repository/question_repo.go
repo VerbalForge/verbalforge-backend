@@ -108,3 +108,22 @@ func (r *QuestionRepository) Count(filter bson.M) (int64, error) {
 	}
 	return count, nil
 }
+
+// Update updates a question
+func (r *QuestionRepository) Update(id string, question *models.Question) error {
+	ctx := context.Background()
+	filter := bson.M{"_id": id}
+	update := bson.M{"$set": question}
+
+	_, err := r.collection.UpdateOne(ctx, filter, update)
+	return err
+}
+
+// Delete deletes a question by ID
+func (r *QuestionRepository) Delete(id string) error {
+	ctx := context.Background()
+	filter := bson.M{"_id": id}
+
+	_, err := r.collection.DeleteOne(ctx, filter)
+	return err
+}

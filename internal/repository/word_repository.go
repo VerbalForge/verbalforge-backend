@@ -208,6 +208,41 @@ func (r *WordRepository) CreateWord(ctx context.Context, word *models.Word) erro
 	return nil
 }
 
+// UpdateWord updates an existing word
+func (r *WordRepository) UpdateWord(ctx context.Context, id string, word *models.Word) error {
+	word.UpdatedAt = time.Now()
+
+	filter := bson.M{"_id": id}
+	update := bson.M{"$set": word}
+
+	result, err := r.collection.UpdateOne(ctx, filter, update)
+	if err != nil {
+		return fmt.Errorf("failed to update word: %w", err)
+	}
+
+	if result.MatchedCount == 0 {
+		return fmt.Errorf("word not found")
+	}
+
+	return nil
+}
+
+// DeleteWord deletes a word by ID
+func (r *WordRepository) DeleteWord(ctx context.Context, id string) error {
+	filter := bson.M{"_id": id}
+
+	result, err := r.collection.DeleteOne(ctx, filter)
+	if err != nil {
+		return fmt.Errorf("failed to delete word: %w", err)
+	}
+
+	if result.DeletedCount == 0 {
+		return fmt.Errorf("word not found")
+	}
+
+	return nil
+}
+
 // Helper function to find intersection of two string slices
 func intersectSlices(a, b []string) []string {
 	m := make(map[string]bool)

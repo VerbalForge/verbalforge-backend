@@ -18,7 +18,7 @@ type UserPreferences struct {
 
 // User represents a user in the system
 type User struct {
-	ID            string          `json:"id" bson:"_id,omitempty"`
+	ID            string          `json:"id" bson:"_id"`
 	Name          string          `json:"name" bson:"name"`
 	Username      string          `json:"username" bson:"username"`
 	Email         string          `json:"email" bson:"email"`
@@ -35,8 +35,15 @@ type User struct {
 	LastLogin     time.Time       `json:"lastLogin" bson:"last_login"`
 	TotalAttempts int             `json:"totalAttempts" bson:"total_attempts"`
 	ProfileViews  int             `json:"profileViews" bson:"profile_views"`
-	CreatedAt     time.Time       `json:"createdAt" bson:"createdAt"`
-	UpdatedAt     time.Time       `json:"updatedAt" bson:"updatedAt"`
+	// OAuth fields
+	OAuthProvider string `json:"oauthProvider,omitempty" bson:"oauth_provider,omitempty"` // "google", "github", etc.
+	OAuthID       string `json:"oauthId,omitempty" bson:"oauth_id,omitempty"`             // Provider-specific user ID
+	ProfilePicURL string `json:"profilePicUrl,omitempty" bson:"profile_pic_url,omitempty"`
+	// Password reset fields
+	ResetToken       string    `json:"-" bson:"reset_token,omitempty"`
+	ResetTokenExpiry time.Time `json:"-" bson:"reset_token_expiry,omitempty"`
+	CreatedAt        time.Time `json:"createdAt" bson:"createdAt"`
+	UpdatedAt        time.Time `json:"updatedAt" bson:"updatedAt"`
 }
 
 // CreateUserRequest represents the request to create a new user
@@ -65,6 +72,17 @@ type UpdateProfileRequest struct {
 // ChangePasswordRequest represents the request to change password
 type ChangePasswordRequest struct {
 	OldPassword string `json:"oldPassword" binding:"required"`
+	NewPassword string `json:"newPassword" binding:"required,min=6"`
+}
+
+// ForgotPasswordRequest represents the request to initiate password reset
+type ForgotPasswordRequest struct {
+	Email string `json:"email" binding:"required,email"`
+}
+
+// ResetPasswordRequest represents the request to reset password with token
+type ResetPasswordRequest struct {
+	Token       string `json:"token" binding:"required"`
 	NewPassword string `json:"newPassword" binding:"required,min=6"`
 }
 
@@ -104,4 +122,21 @@ type RecentActivityItem struct {
 // UserProfileResponse represents the complete user profile response
 type UserProfileResponse struct {
 	User *User `json:"user"`
+}
+
+// GoogleOAuthRequest represents the Google OAuth token exchange request
+type GoogleOAuthRequest struct {
+	Token string `json:"token" binding:"required"` // Google ID token from frontend
+}
+
+// GoogleUserInfo represents the user info from Google
+type GoogleUserInfo struct {
+	Sub           string `json:"sub"` // Google user ID
+	Email         string `json:"email"`
+	EmailVerified string `json:"email_verified"` // Google returns "true" or "false" as string
+	Name          string `json:"name"`
+	GivenName     string `json:"given_name"`
+	FamilyName    string `json:"family_name"`
+	Picture       string `json:"picture"`
+	Locale        string `json:"locale"`
 }

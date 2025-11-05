@@ -14,12 +14,14 @@ import (
 type WordController struct {
 	wordService     *services.WordService
 	userWordService *services.UserWordService
+	activityService *services.UserActivityService
 }
 
-func NewWordController(wordService *services.WordService, userWordService *services.UserWordService) *WordController {
+func NewWordController(wordService *services.WordService, userWordService *services.UserWordService, activityService *services.UserActivityService) *WordController {
 	return &WordController{
 		wordService:     wordService,
 		userWordService: userWordService,
+		activityService: activityService,
 	}
 }
 
@@ -126,6 +128,29 @@ func (c *WordController) GetWordByID(ctx *gin.Context) {
 		}
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
+	}
+
+	// Log word view activity if user is authenticated
+	if userID, exists := ctx.Get("userID"); exists {
+		// Get user's word progress for current counts
+		userWords, _ := c.userWordService.GetUserWords(ctx.Request.Context(), userID.(string))
+		knownCount := 0
+		practiceCount := 0
+		if userWords != nil {
+			knownCount = len(userWords.Known)
+			practiceCount = len(userWords.Practice)
+		}
+
+		metadata := models.WordActivityMetadata{
+			WordID:        id,
+			Word:          word.Word,
+			ActionType:    models.ActionWordViewed,
+			KnownCount:    knownCount,
+			PracticeCount: practiceCount,
+		}
+
+		// Log the view activity (fire and forget)
+		go c.activityService.LogWordActivity(userID.(string), metadata)
 	}
 
 	ctx.JSON(http.StatusOK, word)

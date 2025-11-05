@@ -12,10 +12,10 @@ type Choice struct {
 
 // QuestionMetadata represents question metadata
 type QuestionMetadata struct {
-	CreatedAt   time.Time `json:"created_at" bson:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at" bson:"updated_at"`
-	PublishedAt time.Time `json:"published_at" bson:"published_at"`
-	BatchID     string    `json:"batch_id" bson:"batch_id"`
+	CreatedAt   time.Time  `json:"created_at" bson:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at" bson:"updated_at"`
+	PublishedAt *time.Time `json:"published_at,omitempty" bson:"published_at,omitempty"`
+	BatchID     string     `json:"batch_id" bson:"batch_id"`
 }
 
 // Question represents a question in the system
@@ -38,7 +38,8 @@ type PartialQuestion struct {
 	Topic           string `json:"topic" bson:"topic"`
 	QuestionText    string `json:"question_text" bson:"question_text"`
 	Metadata        struct {
-		CreatedAt string `json:"created_at" bson:"created_at"`
+		CreatedAt   time.Time  `json:"created_at" bson:"created_at"`
+		PublishedAt *time.Time `json:"published_at,omitempty" bson:"published_at,omitempty"`
 	} `json:"metadata" bson:"metadata"`
 }
 

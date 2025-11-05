@@ -31,20 +31,21 @@ func SetupRouter(db *mongo.Database) *gin.Engine {
 	feedbackRepo := repository.NewFeedbackRepository(db)
 
 	// Initialize services
-	authService := services.NewAuthService(userRepo, cfg.JWTSecret)
+	frontendURL := cfg.FrontendURLs[0] // Use first frontend URL for OAuth redirect
+	authService := services.NewAuthService(userRepo, cfg.JWTSecret, cfg.GoogleClientID, cfg.GoogleClientSecret, frontendURL)
 	activitySummaryService := services.NewUserActivitySummaryService(userActivitySummaryRepo)
 	activityService := services.NewUserActivityService(userActivityRepo, activitySummaryService, userRepo)
 	userService := services.NewUserService(userRepo, userQuestionRepo, activityService)
-	questionService := services.NewQuestionService(questionRepo, userQuestionRepo, passageRepo, userRepo, activityService)
-	passageService := services.NewPassageService(passageRepo, questionRepo, userQuestionRepo, userRepo, activityService)
+	cacheService := services.NewCacheService()
+	questionService := services.NewQuestionService(questionRepo, userQuestionRepo, passageRepo, userRepo, activityService, cacheService)
+	passageService := services.NewPassageService(passageRepo, questionRepo, userQuestionRepo, userRepo, activityService, cacheService)
 	discussionService := services.NewDiscussionService(discussionRepo, userRepo, questionRepo, passageRepo, activityService)
 	fileService := services.NewFileService(cfg.UploadDir)
 	wordService := services.NewWordService(wordRepo)
-	userWordService := services.NewUserWordService(userWordRepo)
+	userWordService := services.NewUserWordService(userWordRepo, wordRepo, activityService)
 	faqService := services.NewFAQService(faqRepo)
 	supportService := services.NewSupportTicketService(supportRepo)
 	feedbackService := services.NewFeedbackService(feedbackRepo)
-	cacheService := services.NewCacheService()
 	practiceService := services.NewPracticeService(questionRepo, passageRepo, cacheService)
 
 	// Initialize handlers
@@ -58,9 +59,10 @@ func SetupRouter(db *mongo.Database) *gin.Engine {
 	supportHandler := handlers.NewSupportTicketHandler(supportService)
 	feedbackHandler := handlers.NewFeedbackHandler(feedbackService)
 	practiceHandler := handlers.NewPracticeHandler(practiceService)
+	wordHandler := handlers.NewWordHandler(wordService)
 
 	// Initialize controllers
-	wordController := controllers.NewWordController(wordService, userWordService)
+	wordController := controllers.NewWordController(wordService, userWordService, activityService)
 
 	// Create router
 	router := gin.Default()
@@ -86,6 +88,10 @@ func SetupRouter(db *mongo.Database) *gin.Engine {
 	{
 		auth.POST("/register", authHandler.Register)
 		auth.POST("/login", authHandler.Login)
+		auth.POST("/google", authHandler.GoogleLogin)
+		auth.POST("/forgot-password", authHandler.ForgotPassword)
+		auth.GET("/verify-reset-token", authHandler.VerifyResetToken)
+		auth.POST("/reset-password", authHandler.ResetPassword)
 		auth.GET("/me", middleware.AuthMiddleware(cfg.JWTSecret), authHandler.GetCurrentUser)
 		auth.POST("/refresh", middleware.AuthMiddleware(cfg.JWTSecret), authHandler.RefreshToken)
 		auth.POST("/change-password", middleware.AuthMiddleware(cfg.JWTSecret), authHandler.ChangePassword)
@@ -120,6 +126,7 @@ func SetupRouter(db *mongo.Database) *gin.Engine {
 		profile.GET("/:username/stats", userHandler.GetUserStatsByUsername)
 		profile.GET("/:username/activity", userHandler.GetUserRecentActivity)
 		profile.GET("/:username/activity/summary", userHandler.GetActivityCalendar)
+		profile.GET("/:username/words/statistics", userHandler.GetWordStatistics)
 	}
 
 	// Leaderboard routes
@@ -226,6 +233,40 @@ func SetupRouter(db *mongo.Database) *gin.Engine {
 		admin.GET("/feedback", feedbackHandler.GetAllFeedback)
 		admin.PATCH("/feedback/:id/status", feedbackHandler.UpdateFeedbackStatus)
 		admin.DELETE("/feedback/:id", feedbackHandler.DeleteFeedback)
+
+		// Question admin routes
+		admin.GET("/questions", questionHandler.AdminGetAllQuestions)
+		admin.GET("/questions/:id", questionHandler.GetQuestionByID) // Reuse existing handler
+		admin.PUT("/questions/:id", questionHandler.AdminUpdateQuestion)
+		admin.DELETE("/questions/:id", questionHandler.AdminDeleteQuestion)
+		admin.PATCH("/questions/:id/publish", questionHandler.AdminPublishQuestion)
+		admin.POST("/questions/bulk-delete", questionHandler.AdminBulkDeleteQuestions)
+		admin.POST("/questions/bulk-publish", questionHandler.AdminBulkPublishQuestions)
+
+		// Passage admin routes
+		admin.GET("/passages", passageHandler.AdminGetAllPassages)
+		admin.GET("/passages/:id", passageHandler.GetPassageByID) // Reuse existing handler
+		admin.PUT("/passages/:id", passageHandler.AdminUpdatePassage)
+		admin.DELETE("/passages/:id", passageHandler.AdminDeletePassage)
+		admin.PATCH("/passages/:id/publish", passageHandler.AdminPublishPassage)
+		admin.POST("/passages/bulk-delete", passageHandler.AdminBulkDeletePassages)
+		admin.POST("/passages/bulk-publish", passageHandler.AdminBulkPublishPassages)
+
+		// Word admin routes
+		admin.GET("/words", wordHandler.AdminGetAllWords)
+		admin.GET("/words/:id", wordHandler.AdminGetWordByID)
+		admin.POST("/words", wordHandler.AdminCreateWord)
+		admin.PUT("/words/:id", wordHandler.AdminUpdateWord)
+		admin.DELETE("/words/:id", wordHandler.AdminDeleteWord)
+
+		// Discussion moderation routes
+		admin.GET("/discussions", discussionHandler.AdminGetAllDiscussions)
+		admin.DELETE("/discussions/:id", discussionHandler.AdminDeleteDiscussion)
+
+		// User activity admin routes
+		admin.GET("/users/total", userHandler.AdminGetTotalUsers)
+		admin.GET("/users/:userId/activity", userHandler.AdminGetUserActivity)
+		admin.GET("/users/:userId/stats", userHandler.AdminGetUserStats)
 	}
 
 	return router

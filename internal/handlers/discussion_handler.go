@@ -300,3 +300,39 @@ func (h *DiscussionHandler) SearchDiscussions(c *gin.Context) {
 
 	utils.SuccessResponse(c, http.StatusOK, response)
 }
+
+// Admin-specific handlers
+
+// AdminGetAllDiscussions returns all discussions for moderation (admin only)
+func (h *DiscussionHandler) AdminGetAllDiscussions(c *gin.Context) {
+	limitStr := c.DefaultQuery("limit", "50")
+	skipStr := c.DefaultQuery("skip", "0")
+
+	limit, _ := strconv.ParseInt(limitStr, 10, 64)
+	skip, _ := strconv.ParseInt(skipStr, 10, 64)
+
+	discussions, total, err := h.discussionService.GetAllDiscussions(limit, skip)
+	if err != nil {
+		utils.InternalServerErrorResponse(c, err.Error())
+		return
+	}
+
+	utils.SuccessResponse(c, http.StatusOK, gin.H{
+		"discussions": discussions,
+		"total":       total,
+		"limit":       limit,
+		"skip":        skip,
+	})
+}
+
+// AdminDeleteDiscussion deletes a discussion (admin only)
+func (h *DiscussionHandler) AdminDeleteDiscussion(c *gin.Context) {
+	discussionID := c.Param("id")
+
+	if err := h.discussionService.DeleteDiscussionByID(discussionID); err != nil {
+		utils.InternalServerErrorResponse(c, err.Error())
+		return
+	}
+
+	utils.SuccessResponse(c, http.StatusOK, gin.H{"message": "Discussion deleted successfully"})
+}
